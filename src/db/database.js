@@ -15,11 +15,6 @@ export const database = new Database({
   actionsEnabled: true,
 });
 
-export const database = new Database({
-    adapter,
-    modelClasses: [Post], // List all your models here
-    actionsEnabled: true,
-  });
 
   export const createPost = async (title, body) => {
     // All write operations must be wrapped in a database.write() call
