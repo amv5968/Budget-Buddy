@@ -1,3 +1,4 @@
+import * as SQLite from 'expo-sqlite';
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, AccessibilityInfo } from 'react-native';
 import { db } from '../src/db/sqlite';                    // <-- relative path is correct
