@@ -1,28 +1,47 @@
-import * as SQLite from 'expo-sqlite';
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, AccessibilityInfo } from 'react-native';
-import { db } from '../src/db/sqlite';                    // <-- relative path is correct
+import {
+  AccessibilityInfo,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+import { db } from '../src/db/sqlite'; // path is correct from app/*
 import { formatCurrencyFromCents } from '../src/utils/currency';
 
 export default function AddTransaction() {
-  const [amount, setAmount] = useState('');              // dollars as string
-  const [type, setType] = useState<'income'|'expense'>('expense');
+  const [amount, setAmount] = useState('');          // dollars as string
+  const [type, setType] = useState<'income' | 'expense'>('expense');
   const [note, setNote] = useState('');
 
   const save = () => {
-    const cents = Math.round(Number(amount) * 100);
-    if (!cents || cents <= 0) {
+    // safer validation
+    const n = Number(amount);
+    const cents = Math.round(n * 100);
+    if (!Number.isFinite(n) || cents <= 0) {
       AccessibilityInfo.announceForAccessibility('Enter a valid amount');
       return;
     }
 
-    db.transaction(tx => {
+    db.transaction((tx: any) => {
       tx.executeSql(
         `INSERT INTO transactions (amount_cents, type, occurred_at, note)
          VALUES (?, ?, ?, ?);`,
         [cents, type, Date.now(), note || null],
-        () => AccessibilityInfo.announceForAccessibility('Transaction saved'),
-        (_, err) => { console.warn(err); return false; }
+        // success
+        () => {
+          AccessibilityInfo.announceForAccessibility('Transaction saved');
+          setAmount('');
+          setNote('');
+        },
+        // error
+        (_tx: any, err: any) => {
+          console.warn('SQL error:', err);
+          // returning true marks the error as handled and aborts the tx cleanly
+          return true;
+        }
       );
     });
   };
@@ -31,7 +50,9 @@ export default function AddTransaction() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Add {type === 'expense' ? 'Expense' : 'Income'}</Text>
+      <Text style={styles.header}>
+        Add {type === 'expense' ? 'Expense' : 'Income'}
+      </Text>
 
       <Text>Amount</Text>
       <TextInput
@@ -44,22 +65,37 @@ export default function AddTransaction() {
       />
 
       <View style={styles.row}>
-        <Pressable onPress={() => setType('expense')} style={[styles.button, type==='expense' && styles.active]} accessibilityRole="button">
+        <Pressable
+          onPress={() => setType('expense')}
+          style={[styles.button, type === 'expense' && styles.active]}
+          accessibilityRole="button"
+        >
           <Text>Expense</Text>
         </Pressable>
-        <Pressable onPress={() => setType('income')} style={[styles.button, type==='income' && styles.active]} accessibilityRole="button">
+        <Pressable
+          onPress={() => setType('income')}
+          style={[styles.button, type === 'income' && styles.active]}
+          accessibilityRole="button"
+        >
           <Text>Income</Text>
         </Pressable>
       </View>
 
       <Text>Note (optional)</Text>
-      <TextInput accessibilityLabel="Note" value={note} onChangeText={setNote} style={styles.input} />
+      <TextInput
+        accessibilityLabel="Note"
+        value={note}
+        onChangeText={setNote}
+        style={styles.input}
+      />
 
       <Pressable onPress={save} style={styles.saveButton} accessibilityRole="button">
         <Text style={styles.saveText}>Save Transaction</Text>
       </Pressable>
 
-      <Text style={{ marginTop: 10 }}>Preview: {formatCurrencyFromCents(previewCents)}</Text>
+      <Text style={{ marginTop: 10 }}>
+        Preview: {formatCurrencyFromCents(previewCents)}
+      </Text>
     </View>
   );
 }
@@ -72,5 +108,5 @@ const styles = StyleSheet.create({
   button: { flex: 1, padding: 12, borderWidth: 1, borderRadius: 8, alignItems: 'center' },
   active: { backgroundColor: '#eee' },
   saveButton: { backgroundColor: '#007AFF', padding: 14, borderRadius: 10, alignItems: 'center' },
-  saveText: { color: '#fff', fontWeight: '700' }
+  saveText: { color: '#fff', fontWeight: '700' },
 });
