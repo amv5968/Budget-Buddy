@@ -1,5 +1,5 @@
 {
-  "name": "MyMobileApp",
+  "name": "mymobileapp",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -13,10 +13,25 @@
     "@nozbe/watermelondb": "^0.28.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native/new-app-screen": "0.81.4",
+    "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.8",
+    "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "react": "19.1.0",
     "react-native": "0.81.4",
-    "react-native-safe-area-context": "^5.5.2",
-    "react-native-sqlite-storage": "^6.0.1"
+    "react-native-gesture-handler": "^2.28.0",
+    "react-native-get-random-values": "^1.11.0",
+    "react-native-paper": "^5.14.5",
+    "react-native-reanimated": "^4.1.2",
+    "react-native-safe-area-context": "^5.6.1",
+    "react-native-screens": "^4.16.0",
+    "react-native-sqlite-storage": "^6.0.1",
+    "react-navigation": "^5.0.0",
+    "sequelize": "^6.37.7",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -40,5 +55,18 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "description": "This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amv5968/Budget-Buddy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/amv5968/Budget-Buddy/issues"
+  },
+  "homepage": "https://github.com/amv5968/Budget-Buddy#readme"
 }
