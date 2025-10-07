@@ -1,17 +1,19 @@
 import axios from 'axios';
 
-// 👇 replace with your backend server URL
+// 👇 Use 10.0.2.2 for Android emulator to access your computer's localhost
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'http://10.0.2.2:5000/api',
 });
 
+// Example function: get all transactions
+export const getTransactions = async () => {
+  try {
+    const response = await API.get('/transactions');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    return [];
+  }
+};
+
 export default API;
-
-
-app.get('/api/transactions', (req, res) => {
-    res.json([
-      { id: 1, type: 'Income', amount: 2000, category: 'Salary' },
-      { id: 2, type: 'Expense', amount: 500, category: 'Groceries' }
-    ]);
-  });
-  

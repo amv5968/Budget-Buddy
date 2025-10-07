@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import axios from 'axios';
+import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 
-const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
+export default function LoginScreen({ navigation }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = async () => {
-    try {
-      const response = await axios.post('http://localhost:5000/api/login', { email, password });
-      Alert.alert('Login Successful', response.data.message);
+  const handleLogin = () => {
+    if (username && password) {
       navigation.navigate('Dashboard');
-    } catch (error) {
-      Alert.alert('Error', 'Invalid credentials or server not reachable');
+    } else {
+      alert('Please enter both fields');
     }
   };
 
@@ -20,27 +17,25 @@ const LoginScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Budget Buddy Login</Text>
       <TextInput
+        placeholder="Username"
+        value={username}
+        onChangeText={setUsername}
         style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
       />
       <TextInput
-        style={styles.input}
         placeholder="Password"
-        secureTextEntry
         value={password}
         onChangeText={setPassword}
+        secureTextEntry
+        style={styles.input}
       />
       <Button title="Login" onPress={handleLogin} />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  input: { borderWidth: 1, borderColor: '#ccc', marginBottom: 15, padding: 10, borderRadius: 5 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  title: { fontSize: 24, marginBottom: 20 },
+  input: { width: '100%', borderWidth: 1, borderColor: '#ccc', padding: 10, marginVertical: 10, borderRadius: 5 },
 });
-
-export default LoginScreen;

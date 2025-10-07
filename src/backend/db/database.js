@@ -2,25 +2,25 @@
 import { Database } from '@nozbe/watermelondb'
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite'
 
-// Import your schema and Post model
-import Post from '../../../model/Post'
-import schema from '../../../model/schema'
+// Import schema and model
+import Post from '../../model/Post'
+import schema from '../../model/schema'
 
-// Create SQLite adapter
+// Create the SQLite adapter
 const adapter = new SQLiteAdapter({
   schema,
   dbName: 'MyAppDB',
 })
 
-// Create database instance
-export const database = new Database({
+// Initialize the WatermelonDB database
+const database = new Database({
   adapter,
   modelClasses: [Post],
   actionsEnabled: true,
 })
 
-// 👇 Export createPost function
-export async function createPost(title, body) {
+// Named export for creating a new post
+const createPost = async (title, body) => {
   await database.write(async () => {
     await database.get('posts').create(post => {
       post.title = title
@@ -28,3 +28,5 @@ export async function createPost(title, body) {
     })
   })
 }
+
+export { database, createPost }
