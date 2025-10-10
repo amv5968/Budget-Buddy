@@ -1,98 +1,168 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import React, { useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { Link } from 'expo-router';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [transactions, setTransactions] = useState([
+    { id: 1, type: 'Income', amount: 2000, category: 'Salary' },
+    { id: 2, type: 'Expense', amount: 500, category: 'Groceries' },
+    { id: 3, type: 'Expense', amount: 150, category: 'Transport' },
+    { id: 4, type: 'Income', amount: 300, category: 'Freelance' },
+  ]);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const totalIncome = transactions
+    .filter(t => t.type === 'Income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const totalExpense = transactions
+    .filter(t => t.type === 'Expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>💰 Budget Buddy</Text>
+      
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryLabel}>Income</Text>
+          <Text style={styles.incomeText}>${totalIncome}</Text>
+        </View>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryLabel}>Expenses</Text>
+          <Text style={styles.expenseText}>${totalExpense}</Text>
+        </View>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryLabel}>Balance</Text>
+          <Text style={styles.balanceText}>${totalIncome - totalExpense}</Text>
+        </View>
+      </View>
+
+      <View style={styles.headerRow}>
+        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+        <Link href="/(tabs)/add-transaction" asChild>
+          <TouchableOpacity style={styles.addButton}>
+            <Text style={styles.addButtonText}>+ Add</Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+      
+      <FlatList
+        data={transactions}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.transactionItem}>
+            <View>
+              <Text style={styles.transactionCategory}>{item.category}</Text>
+              <Text style={styles.transactionType}>{item.type}</Text>
+            </View>
+            <Text style={[
+              styles.transactionAmount,
+              { color: item.type === 'Income' ? '#4CAF50' : '#F44336' }
+            ]}>
+              {item.type === 'Income' ? '+' : '-'}${item.amount}
+            </Text>
+          </View>
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: { 
+    flex: 1, 
+    padding: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  title: { 
+    fontSize: 32, 
+    fontWeight: 'bold', 
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  summaryContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 30,
+  },
+  summaryBox: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    flex: 1,
+    marginHorizontal: 5,
     alignItems: 'center',
-    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  summaryLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 5,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  incomeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  expenseText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#F44336',
+  },
+  balanceText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2196F3',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  addButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  transactionItem: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  transactionCategory: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  transactionType: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  transactionAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
