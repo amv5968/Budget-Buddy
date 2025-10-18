@@ -10,27 +10,27 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { getGoals, type Goal } from '../services/goalService';
+import { getBudgets, type Budget } from '../services/budgetService';
 
-export default function GoalsScreen() {
+export default function BudgetsScreen() {
   const router = useRouter();
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      loadGoals();
+      loadBudgets();
     }, [])
   );
 
-  const loadGoals = async () => {
+  const loadBudgets = async () => {
     try {
-      const data = await getGoals();
-      setGoals(data);
+      const data = await getBudgets();
+      setBudgets(data);
     } catch (error) {
-      console.error('Error loading goals:', error);
-      Alert.alert('Error', 'Failed to load goals');
+      console.error('Error loading budgets:', error);
+      Alert.alert('Error', 'Failed to load budgets');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -39,11 +39,17 @@ export default function GoalsScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadGoals();
+    loadBudgets();
   };
 
-  const getProgressPercentage = (saved: number, target: number) => {
-    return Math.min((saved / target) * 100, 100);
+  const getProgressPercentage = (spent: number, total: number) => {
+    return Math.min((spent / total) * 100, 100);
+  };
+
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 90) return '#F44336';
+    if (percentage >= 70) return '#FF9800';
+    return '#4CAF50';
   };
 
   if (loading) {
@@ -57,55 +63,55 @@ export default function GoalsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Savings Goals</Text>
+        <Text style={styles.title}>Budgets</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push('//add-goal')}
+          onPress={() => router.push('//add-budget')}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
-      {goals.length === 0 ? (
+      {budgets.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🎯</Text>
-          <Text style={styles.emptyText}>No goals yet</Text>
-          <Text style={styles.emptySubtext}>Set a savings goal to stay motivated!</Text>
+          <Text style={styles.emptyIcon}>💰</Text>
+          <Text style={styles.emptyText}>No budgets yet</Text>
+          <Text style={styles.emptySubtext}>Create a budget to track your spending!</Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => router.push('//add-goal')}
+            onPress={() => router.push('//add-budget')}
           >
-            <Text style={styles.emptyButtonText}>Create Goal</Text>
+            <Text style={styles.emptyButtonText}>Create Budget</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={goals}
+          data={budgets}
           keyExtractor={(item) => item._id}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           renderItem={({ item }) => {
-            const percentage = getProgressPercentage(item.savedAmount, item.targetAmount);
-            const remaining = item.targetAmount - item.savedAmount;
+            const percentage = getProgressPercentage(item.spentAmount, item.totalAmount);
+            const progressColor = getProgressColor(percentage);
 
             return (
               <TouchableOpacity
-                style={styles.goalCard}
-                onPress={() => router.push(`//edit-goal?id=${item._id}`)}
+                style={styles.budgetCard}
+                onPress={() => router.push(`//edit-budget?id=${item._id}`)}
               >
-                <View style={styles.goalHeader}>
-                  <View style={styles.goalInfo}>
-                    <Text style={styles.goalIcon}>{item.icon || '🎯'}</Text>
-                    <View style={styles.goalDetails}>
-                      <Text style={styles.goalName}>{item.name}</Text>
-                      <Text style={styles.goalAmount}>
-                        ${item.savedAmount.toFixed(2)} / ${item.targetAmount.toFixed(2)}
+                <View style={styles.budgetHeader}>
+                  <View style={styles.budgetInfo}>
+                    <Text style={styles.budgetIcon}>{item.icon || '💵'}</Text>
+                    <View>
+                      <Text style={styles.budgetCategory}>{item.category}</Text>
+                      <Text style={styles.budgetAmount}>
+                        ${item.spentAmount.toFixed(2)} / ${item.totalAmount.toFixed(2)}
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.goalPercentage}>
-                    <Text style={styles.percentageText}>
+                  <View style={styles.budgetPercentage}>
+                    <Text style={[styles.percentageText, { color: progressColor }]}>
                       {percentage.toFixed(0)}%
                     </Text>
                   </View>
@@ -117,23 +123,15 @@ export default function GoalsScreen() {
                       styles.progressBar,
                       {
                         width: `${percentage}%`,
-                        backgroundColor: percentage >= 100 ? '#4CAF50' : '#2196F3',
+                        backgroundColor: progressColor,
                       },
                     ]}
                   />
                 </View>
 
-                <View style={styles.goalFooter}>
-                  <Text style={styles.remainingText}>
-                    {remaining > 0 
-                      ? `$${remaining.toFixed(2)} remaining`
-                      : 'Goal achieved! 🎉'
-                    }
-                  </Text>
-                  {percentage >= 100 && (
-                    <Text style={styles.achievedBadge}>✓ Completed</Text>
-                  )}
-                </View>
+                <Text style={styles.remainingText}>
+                  ${(item.totalAmount - item.spentAmount).toFixed(2)} remaining
+                </Text>
               </TouchableOpacity>
             );
           }}
@@ -213,7 +211,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 20,
   },
-  goalCard: {
+  budgetCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
@@ -224,41 +222,37 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  goalHeader: {
+  budgetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  goalInfo: {
+  budgetInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  goalIcon: {
+  budgetIcon: {
     fontSize: 32,
     marginRight: 12,
   },
-  goalDetails: {
-    flex: 1,
-  },
-  goalName: {
+  budgetCategory: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
-  goalAmount: {
+  budgetAmount: {
     fontSize: 14,
     color: '#666',
   },
-  goalPercentage: {
+  budgetPercentage: {
     alignItems: 'flex-end',
   },
   percentageText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2196F3',
   },
   progressBarContainer: {
     height: 8,
@@ -271,18 +265,9 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 4,
   },
-  goalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   remainingText: {
     fontSize: 12,
     color: '#666',
-  },
-  achievedBadge: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
+    textAlign: 'right',
   },
 });

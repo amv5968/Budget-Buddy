@@ -7,32 +7,59 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { signup as apiSignup } from '../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
-  const handleSignUp = () => {
-    if (!email || !username || !password || !confirmPassword) {
-      alert('Please fill in all fields');
+  const handleSignUp = async () => {
+    if (!email.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
     
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
-    // Handle sign up logic here
-    alert('Account created successfully!');
-    router.replace('/(tabs)');
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await apiSignup(username.trim(), email.trim(), password);
+      await login(response.user, response.token);
+      Alert.alert('Success', 'Account created successfully!');
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      const errorMessage = error.response?.data?.error || 'Signup failed. Please try again.';
+      Alert.alert('Signup Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,6 +96,7 @@ export default function SignUpScreen() {
                   placeholderTextColor="#999"
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  editable={!loading}
                 />
               </View>
 
@@ -80,17 +108,19 @@ export default function SignUpScreen() {
                   style={styles.input}
                   placeholderTextColor="#999"
                   autoCapitalize="none"
+                  editable={!loading}
                 />
               </View>
 
               <View style={styles.inputContainer}>
                 <TextInput
-                  placeholder="Password"
+                  placeholder="Password (min 6 characters)"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                   style={styles.input}
                   placeholderTextColor="#999"
+                  editable={!loading}
                 />
               </View>
 
@@ -102,15 +132,21 @@ export default function SignUpScreen() {
                   secureTextEntry
                   style={styles.input}
                   placeholderTextColor="#999"
+                  editable={!loading}
                 />
               </View>
 
               <TouchableOpacity 
-                style={styles.signupButton} 
+                style={[styles.signupButton, loading && styles.signupButtonDisabled]} 
                 onPress={handleSignUp}
                 activeOpacity={0.8}
+                disabled={loading}
               >
-                <Text style={styles.signupButtonText}>Sign Up</Text>
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.signupButtonText}>Sign Up</Text>
+                )}
               </TouchableOpacity>
 
               <View style={styles.loginContainer}>
@@ -151,7 +187,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 40,
   },
   logoCircle: {
     width: 100,
@@ -171,15 +207,15 @@ const styles = StyleSheet.create({
     fontSize: 50,
   },
   appTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#2196F3',
     letterSpacing: 0.5,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
     color: '#666',
-    marginTop: 8,
   },
   inputSection: {
     width: '100%',
@@ -200,12 +236,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
-    marginTop: 8,
     shadowColor: '#66BB6A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+    marginTop: 8,
+  },
+  signupButtonDisabled: {
+    opacity: 0.7,
   },
   signupButtonText: {
     color: 'white',

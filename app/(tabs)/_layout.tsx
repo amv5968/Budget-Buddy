@@ -1,69 +1,75 @@
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Text } from 'react-native';
 
-export default function TabsLayout() {
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: '#666',
+        headerShown: false,
+        tabBarActiveTintColor: '#66BB6A',
+        tabBarInactiveTintColor: '#999',
         tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopWidth: 1,
-          borderTopColor: '#eee',
-          paddingBottom: 5,
           height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="transactions"
-        options={{
-          title: 'Transactions',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
-          ),
+          title: 'Home',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏠</Text>,
         }}
       />
       <Tabs.Screen
         name="add-transaction"
         options={{
-          title: 'Add',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
-        name="budget"
+        name="edit-transaction"
         options={{
-          title: 'Budget',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="pie-chart" size={size} color={color} />
-          ),
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="budgets"
+        options={{
+          title: 'Budgets',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💰</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="add-budget"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="edit-budget"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
         name="goals"
         options={{
           title: 'Goals',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trophy" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🎯</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="add-goal"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="edit-goal"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

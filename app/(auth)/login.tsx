@@ -7,21 +7,39 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { login as apiLogin } from '../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
-  const handleLogin = () => {
-    if (emailOrUsername && password) {
+  const handleLogin = async () => {
+    if (!emailOrUsername.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await apiLogin(emailOrUsername.trim(), password);
+      await login(response.user, response.token);
       router.replace('/(tabs)');
-    } else {
-      alert('Please enter both fields');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';
+      Alert.alert('Login Failed', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,7 +59,6 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.formContainer}>
-            {/* Logo Section */}
             <View style={styles.logoContainer}>
               <View style={styles.logoCircle}>
                 <Text style={styles.logoEmoji}>💰</Text>
@@ -49,7 +66,6 @@ export default function LoginScreen() {
               <Text style={styles.appTitle}>Budget Buddy</Text>
             </View>
 
-            {/* Input Section */}
             <View style={styles.inputSection}>
               <View style={styles.inputContainer}>
                 <TextInput
@@ -60,6 +76,7 @@ export default function LoginScreen() {
                   placeholderTextColor="#999"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  editable={!loading}
                 />
               </View>
 
@@ -71,28 +88,28 @@ export default function LoginScreen() {
                   secureTextEntry
                   style={styles.input}
                   placeholderTextColor="#999"
+                  editable={!loading}
                 />
               </View>
 
-              <TouchableOpacity style={styles.forgotPasswordContainer}>
-                <Text style={styles.forgotPasswordText}>Forgot a password?</Text>
-              </TouchableOpacity>
-
-              {/* Login Button */}
               <TouchableOpacity 
-                style={styles.loginButton} 
+                style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
                 onPress={handleLogin}
                 activeOpacity={0.8}
+                disabled={loading}
               >
-                <Text style={styles.loginButtonText}>Login</Text>
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
               </TouchableOpacity>
 
-              {/* Sign Up Link */}
               <View style={styles.signupContainer}>
-                <Text style={styles.signupText}>Don't have an account </Text>
-              <TouchableOpacity onPress={() => router.push('./signup')}>
-                <Text style={styles.signupLink}>Sign up?</Text>
-              </TouchableOpacity>
+                <Text style={styles.signupText}>Don't have an account? </Text>
+                <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+                  <Text style={styles.signupLink}>Sign up</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -165,14 +182,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  forgotPasswordContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    color: '#666',
-    fontSize: 14,
-  },
   loginButton: {
     backgroundColor: '#66BB6A',
     borderRadius: 12,
@@ -183,6 +192,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+    marginTop: 8,
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginButtonText: {
     color: 'white',

@@ -10,31 +10,27 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { addTransaction } from '../services/transactionService';
+import { addBudget } from '../services/budgetService';
 
-const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
-const EXPENSE_CATEGORIES = [
-  'Groceries',
-  'Transport',
-  'Food',
-  'Entertainment',
-  'Shopping',
-  'Healthcare',
-  'Education',
-  'Utilities',
-  'Rent',
-  'Other',
+const BUDGET_CATEGORIES = [
+  { name: 'Groceries', icon: '🛒' },
+  { name: 'Transport', icon: '🚗' },
+  { name: 'Food', icon: '🍔' },
+  { name: 'Entertainment', icon: '🎬' },
+  { name: 'Shopping', icon: '🛍️' },
+  { name: 'Healthcare', icon: '🏥' },
+  { name: 'Education', icon: '📚' },
+  { name: 'Utilities', icon: '💡' },
+  { name: 'Rent', icon: '🏠' },
+  { name: 'Other', icon: '💵' },
 ];
 
-export default function AddTransactionScreen() {
+export default function AddBudgetScreen() {
   const router = useRouter();
-  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
   const [category, setCategory] = useState('');
+  const [icon, setIcon] = useState('');
   const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   const handleSubmit = async () => {
     if (!category) {
@@ -49,19 +45,17 @@ export default function AddTransactionScreen() {
 
     setLoading(true);
     try {
-      await addTransaction({
-        type,
+      await addBudget({
         category,
-        amount: parseFloat(amount),
-        description: description.trim(),
-        date: new Date().toISOString(),
+        totalAmount: parseFloat(amount),
+        icon,
       });
 
-      Alert.alert('Success', 'Transaction added successfully!');
+      Alert.alert('Success', 'Budget created successfully!');
       router.back();
     } catch (error: any) {
-      console.error('Error adding transaction:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to add transaction';
+      console.error('Error creating budget:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to create budget';
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
@@ -74,36 +68,11 @@ export default function AddTransactionScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Add Transaction</Text>
-      </View>
-
-      <View style={styles.typeContainer}>
-        <TouchableOpacity
-          style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
-          onPress={() => {
-            setType('Income');
-            setCategory('');
-          }}
-        >
-          <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
-            Income
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
-          onPress={() => {
-            setType('Expense');
-            setCategory('');
-          }}
-        >
-          <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
-            Expense
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Create Budget</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Amount</Text>
+        <Text style={styles.label}>Monthly Budget Amount</Text>
         <TextInput
           style={styles.amountInput}
           placeholder="0.00"
@@ -115,41 +84,32 @@ export default function AddTransactionScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Category</Text>
+        <Text style={styles.label}>Select Category</Text>
         <View style={styles.categoryGrid}>
-          {categories.map((cat) => (
+          {BUDGET_CATEGORIES.map((cat) => (
             <TouchableOpacity
-              key={cat}
+              key={cat.name}
               style={[
                 styles.categoryButton,
-                category === cat && styles.categoryButtonActive,
+                category === cat.name && styles.categoryButtonActive,
               ]}
-              onPress={() => setCategory(cat)}
+              onPress={() => {
+                setCategory(cat.name);
+                setIcon(cat.icon);
+              }}
             >
+              <Text style={styles.categoryIcon}>{cat.icon}</Text>
               <Text
                 style={[
                   styles.categoryText,
-                  category === cat && styles.categoryTextActive,
+                  category === cat.name && styles.categoryTextActive,
                 ]}
               >
-                {cat}
+                {cat.name}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Description (Optional)</Text>
-        <TextInput
-          style={styles.descriptionInput}
-          placeholder="Add a note..."
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={3}
-          placeholderTextColor="#999"
-        />
       </View>
 
       <TouchableOpacity
@@ -160,7 +120,7 @@ export default function AddTransactionScreen() {
         {loading ? (
           <ActivityIndicator color="white" />
         ) : (
-          <Text style={styles.submitButtonText}>Add Transaction</Text>
+          <Text style={styles.submitButtonText}>Create Budget</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -190,34 +150,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
   },
-  typeContainer: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-  },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-  },
-  typeButtonActive: {
-    backgroundColor: '#66BB6A',
-    borderColor: '#66BB6A',
-  },
-  typeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  typeTextActive: {
-    color: 'white',
-  },
   section: {
     paddingHorizontal: 20,
+    marginTop: 24,
     marginBottom: 24,
   },
   label: {
@@ -238,37 +173,36 @@ const styles = StyleSheet.create({
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
   },
   categoryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    width: '30%',
+    aspectRatio: 1,
     backgroundColor: 'white',
-    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
     borderColor: '#e0e0e0',
+    padding: 12,
   },
   categoryButtonActive: {
     backgroundColor: '#E3F2FD',
     borderColor: '#2196F3',
   },
+  categoryIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
   categoryText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     fontWeight: '500',
+    textAlign: 'center',
   },
   categoryTextActive: {
     color: '#2196F3',
     fontWeight: '600',
-  },
-  descriptionInput: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 16,
-    color: '#333',
-    textAlignVertical: 'top',
-    minHeight: 100,
   },
   submitButton: {
     backgroundColor: '#66BB6A',
