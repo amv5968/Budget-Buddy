@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+<<<<<<< HEAD
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -16,10 +17,29 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
+=======
+import { Text } from 'react-native';
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#66BB6A',
+        tabBarInactiveTintColor: '#999',
+        tabBarStyle: {
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+      }}
+    >
+>>>>>>> origin/New-Main-Branch-expo
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
+<<<<<<< HEAD
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -28,8 +48,65 @@ export default function TabLayout() {
         options={{
           title: 'Explore',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+=======
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏠</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="add-transaction"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="edit-transaction"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="budgets"
+        options={{
+          title: 'Budgets',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💰</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="add-budget"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="edit-budget"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="goals"
+        options={{
+          title: 'Goals',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🎯</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="add-goal"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="edit-goal"
+        options={{
+          href: null,
+>>>>>>> origin/New-Main-Branch-expo
         }}
       />
     </Tabs>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> origin/New-Main-Branch-expo
