@@ -1,19 +1,15 @@
-<<<<<<< HEAD
-export { default } from '../add-transaction';
-
-=======
-import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { addTransaction } from '../services/transactionService';
 
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
@@ -296,4 +292,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
->>>>>>> origin/New-Main-Branch-expo

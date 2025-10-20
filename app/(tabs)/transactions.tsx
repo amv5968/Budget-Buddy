@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
   FlatList,
-  StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import * as TxStore from '../services/transactionsStore';
 
 export default function TransactionsScreen() {
   const [filter, setFilter] = useState('All');
-  const [transactions] = useState([
+  const [transactions, setTransactions] = useState([
     { id: 1, name: "Domino's Pizza", category: 'Food', amount: -25.50, date: 'April 20', type: 'Expense', icon: '🍕' },
     { id: 2, name: 'Uber', category: 'Transport', amount: -18.30, date: 'April 18', type: 'Expense', icon: '🚗' },
     { id: 3, name: 'Textbook', category: 'Tuition', amount: -95.00, date: 'April 15', type: 'Expense', icon: '📚' },
@@ -36,7 +37,20 @@ export default function TransactionsScreen() {
       .filter(t => t.type === 'Expense')
       .reduce((sum, t) => sum + t.amount, 0)
   );
+  useEffect(() => {
+    let mounted = true;
 
+    TxStore.getAll().then(stored => {
+      if (!mounted) return;
+      if (stored.length) setTransactions(stored as any);
+    });
+
+    const off = TxStore.onTransactionsChanged(next => {
+      setTransactions(next as any);
+    });
+
+    return () => { mounted = false; off(); };
+  }, []);
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Transactions</Text>
