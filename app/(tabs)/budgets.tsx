@@ -66,7 +66,7 @@ export default function BudgetsScreen() {
         <Text style={styles.title}>Budgets</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push('//add-budget')}
+          onPress={() => router.push('/add-budget')}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
@@ -79,7 +79,7 @@ export default function BudgetsScreen() {
           <Text style={styles.emptySubtext}>Create a budget to track your spending!</Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => router.push('//add-budget')}
+            onPress={() => router.push('/add-budget')}
           >
             <Text style={styles.emptyButtonText}>Create Budget</Text>
           </TouchableOpacity>
@@ -98,7 +98,7 @@ export default function BudgetsScreen() {
             return (
               <TouchableOpacity
                 style={styles.budgetCard}
-                onPress={() => router.push(`//edit-budget?id=${item._id}`)}
+                onPress={() => router.push(`/edit-budget?id=${item._id}`)}
               >
                 <View style={styles.budgetHeader}>
                   <View style={styles.budgetInfo}>

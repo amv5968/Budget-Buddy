@@ -19,57 +19,49 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏠</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>🏠</Text>,
         }}
       />
-      <Tabs.Screen
-        name="add-transaction"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="edit-transaction"
-        options={{
-          href: null,
-        }}
-      />
+
+      {/* Hidden internal routes */}
+      <Tabs.Screen name="add-transaction" options={{ href: null }} />
+      <Tabs.Screen name="edit-transaction" options={{ href: null }} />
+
       <Tabs.Screen
         name="budgets"
         options={{
           title: 'Budgets',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💰</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>💰</Text>,
         }}
       />
-      <Tabs.Screen
-        name="add-budget"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="edit-budget"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="add-budget" options={{ href: null }} />
+      <Tabs.Screen name="edit-budget" options={{ href: null }} />
+
       <Tabs.Screen
         name="goals"
         options={{
           title: 'Goals',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🎯</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>🎯</Text>,
         }}
       />
+      <Tabs.Screen name="add-goal" options={{ href: null }} />
+      <Tabs.Screen name="edit-goal" options={{ href: null }} />
+
+      {/* 💵 Cash Flow Tab */}
       <Tabs.Screen
-        name="add-goal"
+        name="cash-flow"
         options={{
-          href: null,
+          title: 'Cash Flow',
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>💵</Text>,
         }}
       />
+
+      {/* 📘 Resources Tab */}
       <Tabs.Screen
-        name="edit-goal"
+        name="resources"
         options={{
-          href: null,
+          title: 'Resources',
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>📘</Text>,
         }}
       />
     </Tabs>

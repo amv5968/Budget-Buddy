@@ -77,11 +77,11 @@ router.put('/:id', auth, async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!transaction) {
+    if (!updated) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    res.json(transaction);
+    res.json(updated);
   } catch (error) {
     console.error('Update transaction error:', error);
     res.status(500).json({ error: 'Server error updating transaction' });

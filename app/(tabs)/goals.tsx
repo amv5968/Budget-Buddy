@@ -60,7 +60,7 @@ export default function GoalsScreen() {
         <Text style={styles.title}>Savings Goals</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push('//add-goal')}
+          onPress={() => router.push('/add-goal')}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
@@ -73,7 +73,7 @@ export default function GoalsScreen() {
           <Text style={styles.emptySubtext}>Set a savings goal to stay motivated!</Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => router.push('//add-goal')}
+            onPress={() => router.push('/add-goal')}
           >
             <Text style={styles.emptyButtonText}>Create Goal</Text>
           </TouchableOpacity>
@@ -92,7 +92,7 @@ export default function GoalsScreen() {
             return (
               <TouchableOpacity
                 style={styles.goalCard}
-                onPress={() => router.push(`//edit-goal?id=${item._id}`)}
+                onPress={() => router.push(`/edit-goal?id=${item._id}`)}
               >
                 <View style={styles.goalHeader}>
                   <View style={styles.goalInfo}>
