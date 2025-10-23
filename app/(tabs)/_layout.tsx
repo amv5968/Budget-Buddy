@@ -15,6 +15,7 @@ export default function TabLayout() {
         },
       }}
     >
+      {/* 🏠 Home */}
       <Tabs.Screen
         name="index"
         options={{
@@ -23,10 +24,11 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Hidden internal routes */}
+      {/* Hidden routes */}
       <Tabs.Screen name="add-transaction" options={{ href: null }} />
       <Tabs.Screen name="edit-transaction" options={{ href: null }} />
 
+      {/* 💰 Budgets */}
       <Tabs.Screen
         name="budgets"
         options={{
@@ -37,6 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen name="add-budget" options={{ href: null }} />
       <Tabs.Screen name="edit-budget" options={{ href: null }} />
 
+      {/* 🎯 Goals */}
       <Tabs.Screen
         name="goals"
         options={{
@@ -47,7 +50,16 @@ export default function TabLayout() {
       <Tabs.Screen name="add-goal" options={{ href: null }} />
       <Tabs.Screen name="edit-goal" options={{ href: null }} />
 
-      {/* 💵 Cash Flow Tab */}
+      {/* 💸 Transactions */}
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          title: 'Transactions',
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>💸</Text>,
+        }}
+      />
+
+      {/* 💵 Cash Flow */}
       <Tabs.Screen
         name="cash-flow"
         options={{
@@ -56,7 +68,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 📘 Resources Tab */}
+      {/* 📘 Resources */}
       <Tabs.Screen
         name="resources"
         options={{

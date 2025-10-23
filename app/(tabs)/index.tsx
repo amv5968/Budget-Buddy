@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Alert
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Calendar } from 'react-native-calendars';
 import { useAuth } from '../../context/AuthContext';
 import { 
   getTransactions, 
@@ -25,6 +28,7 @@ export default function HomeScreen() {
   const [totalExpense, setTotalExpense] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -112,17 +116,30 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      {/* Header */}
       <View style={styles.headerSection}>
         <View>
           <Text style={styles.title}>💰 Budget Buddy</Text>
           <Text style={styles.welcomeText}>Welcome back, {user?.username}!</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
+
+        <View style={styles.headerButtons}>
+         <TouchableOpacity onPress={() => router.push('/settings')}>
+          <Ionicons name="settings-outline" size={26} color="#333" />
         </TouchableOpacity>
+
+
+          <TouchableOpacity onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={26} color="#F44336" style={{ marginLeft: 16 }} />
+          </TouchableOpacity>
+        </View>
       </View>
-      
+
+      {/* Summary */}
       <View style={styles.summaryContainer}>
         <View style={[styles.summaryBox, styles.incomeBox]}>
           <Text style={styles.summaryLabel}>Income</Text>
@@ -134,31 +151,59 @@ export default function HomeScreen() {
         </View>
         <View style={[styles.summaryBox, styles.balanceBox]}>
           <Text style={styles.summaryLabel}>Balance</Text>
-          <Text style={[
-            styles.balanceText,
-            { color: totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336' }
-          ]}>
+          <Text
+            style={[
+              styles.balanceText,
+              { color: totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336' },
+            ]}
+          >
             ${(totalIncome - totalExpense).toFixed(2)}
           </Text>
         </View>
       </View>
 
+      {/* Calendar Section */}
+      <View style={styles.calendarSection}>
+        <Text style={styles.sectionTitle}>📅 Calendar</Text>
+        <Calendar
+          onDayPress={(day) => setSelectedDate(day.dateString)}
+          markedDates={{
+            [selectedDate]: {
+              selected: true,
+              selectedColor: '#42A5F5',
+            },
+          }}
+          theme={{
+            selectedDayBackgroundColor: '#42A5F5',
+            todayTextColor: '#4CAF50',
+          }}
+        />
+        {selectedDate ? (
+          <Text style={styles.selectedDateText}>
+            Selected Date: {selectedDate}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Transactions */}
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push('/(tabs)/add-transaction')}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
-      
+
       {transactions.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📊</Text>
           <Text style={styles.emptyText}>No transactions yet</Text>
-          <Text style={styles.emptySubtext}>Add your first transaction to get started!</Text>
-          <TouchableOpacity 
+          <Text style={styles.emptySubtext}>
+            Add your first transaction to get started!
+          </Text>
+          <TouchableOpacity
             style={styles.emptyButton}
             onPress={() => router.push('/(tabs)/add-transaction')}
           >
@@ -169,13 +214,10 @@ export default function HomeScreen() {
         <FlatList
           data={transactions}
           keyExtractor={(item) => item._id}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
           renderItem={({ item }) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.transactionItem}
-              onPress={() => router.push(`//edit-transaction?id=${item._id}`)}
+              onPress={() => router.push(`../(tabs)/edit-transaction?id=${item._id}`)}
             >
               <View style={styles.transactionLeft}>
                 <View style={styles.iconContainer}>
@@ -189,11 +231,14 @@ export default function HomeScreen() {
                 </View>
               </View>
               <View style={styles.transactionRight}>
-                <Text style={[
-                  styles.transactionAmount,
-                  { color: item.type === 'Income' ? '#4CAF50' : '#F44336' }
-                ]}>
-                  {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
+                <Text
+                  style={[
+                    styles.transactionAmount,
+                    { color: item.type === 'Income' ? '#4CAF50' : '#F44336' },
+                  ]}
+                >
+                  {item.type === 'Income' ? '+' : '-'}$
+                  {Math.abs(item.amount).toFixed(2)}
                 </Text>
                 <Text style={styles.transactionType}>{item.type}</Text>
               </View>
@@ -202,19 +247,13 @@ export default function HomeScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f5f5f5',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  centerContent: { justifyContent: 'center', alignItems: 'center' },
   headerSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -224,25 +263,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     backgroundColor: 'white',
   },
-  title: { 
-    fontSize: 28, 
-    fontWeight: 'bold', 
-  },
-  welcomeText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  logoutButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  logoutText: {
-    color: '#F44336',
-    fontWeight: '600',
-  },
+  title: { fontSize: 28, fontWeight: 'bold' },
+  welcomeText: { fontSize: 14, color: '#666', marginTop: 4 },
+  headerButtons: { flexDirection: 'row', alignItems: 'center' },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -258,107 +281,58 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
     elevation: 2,
   },
-  incomeBox: {
-    backgroundColor: '#E8F5E9',
+  incomeBox: { backgroundColor: '#E8F5E9' },
+  expenseBox: { backgroundColor: '#FFEBEE' },
+  balanceBox: { backgroundColor: '#E3F2FD' },
+  summaryLabel: { fontSize: 11, color: '#666', marginBottom: 6, fontWeight: '500' },
+  incomeText: { fontSize: 16, fontWeight: 'bold', color: '#4CAF50' },
+  expenseText: { fontSize: 16, fontWeight: 'bold', color: '#F44336' },
+  balanceText: { fontSize: 16, fontWeight: 'bold' },
+  calendarSection: {
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
+    elevation: 2,
   },
-  expenseBox: {
-    backgroundColor: '#FFEBEE',
-  },
-  balanceBox: {
-    backgroundColor: '#E3F2FD',
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 6,
+  selectedDateText: {
+    textAlign: 'center',
+    marginTop: 10,
+    color: '#333',
     fontWeight: '500',
-  },
-  incomeText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  expenseText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#F44336',
-  },
-  balanceText: {
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 10,
     paddingBottom: 15,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   addButton: {
     backgroundColor: '#66BB6A',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    shadowColor: '#66BB6A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
     elevation: 3,
   },
-  addButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
+  addButtonText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  emptyState: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  emptyIcon: { fontSize: 64, marginBottom: 16 },
+  emptyText: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 },
+  emptySubtext: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 24 },
   emptyButton: {
     backgroundColor: '#66BB6A',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  emptyButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
+  emptyButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 20 },
   transactionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -367,17 +341,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
     elevation: 2,
   },
-  transactionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+  transactionLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   iconContainer: {
     width: 45,
     height: 45,
@@ -387,33 +353,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  transactionIcon: {
-    fontSize: 24,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionCategory: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: '#999',
-  },
-  transactionRight: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  transactionType: {
-    fontSize: 11,
-    color: '#999',
-    textTransform: 'uppercase',
-  },
+  transactionIcon: { fontSize: 24 },
+  transactionInfo: { flex: 1 },
+  transactionCategory: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 2 },
+  transactionDate: { fontSize: 12, color: '#999' },
+  transactionRight: { alignItems: 'flex-end' },
+  transactionAmount: { fontSize: 16, fontWeight: 'bold', marginBottom: 2 },
+  transactionType: { fontSize: 11, color: '#999', textTransform: 'uppercase' },
 });
