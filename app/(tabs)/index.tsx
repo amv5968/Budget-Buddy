@@ -9,16 +9,20 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
+import { PieChart } from 'react-native-chart-kit';
 import { useAuth } from '../../context/AuthContext';
 import { 
   getTransactions, 
   getTransactionStats,
   type Transaction 
 } from '../services/transactionService';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
@@ -30,6 +34,10 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
 
+  // New: Allowance
+  const monthlyAllowance = 1000; // You can make this editable later
+  const remaining = monthlyAllowance - totalExpense;
+
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -40,9 +48,9 @@ export default function HomeScreen() {
     try {
       const [transData, statsData] = await Promise.all([
         getTransactions(),
-        getTransactionStats()
+        getTransactionStats(),
       ]);
-      
+
       setTransactions(transData.slice(0, 5));
       setTotalIncome(statsData.totalIncome);
       setTotalExpense(statsData.totalExpense);
@@ -65,39 +73,35 @@ export default function HomeScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/login');
-          }
-        }
-      ]
-    );
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
   };
 
   const getIconForCategory = (category: string) => {
     const icons: { [key: string]: string } = {
-      'Salary': '💰',
-      'Freelance': '💼',
-      'Investment': '📈',
-      'Business': '🏢',
-      'Groceries': '🛒',
-      'Transport': '🚗',
-      'Food': '🍔',
-      'Entertainment': '🎬',
-      'Shopping': '🛍️',
-      'Healthcare': '🏥',
-      'Education': '📚',
-      'Utilities': '💡',
-      'Rent': '🏠',
-      'Other': '💵',
+      Salary: '💰',
+      Freelance: '💼',
+      Investment: '📈',
+      Business: '🏢',
+      Groceries: '🛒',
+      Transport: '🚗',
+      Food: '🍔',
+      Entertainment: '🎬',
+      Shopping: '🛍️',
+      Healthcare: '🏥',
+      Education: '📚',
+      Utilities: '💡',
+      Rent: '🏠',
+      Other: '💵',
     };
     return icons[category] || '💵';
   };
@@ -106,6 +110,45 @@ export default function HomeScreen() {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
+
+  // New: Pie chart data (Expense breakdown)
+  const chartData = [
+    {
+      name: 'Food',
+      amount: 150,
+      color: '#4CAF50',
+      legendFontColor: '#333',
+      legendFontSize: 13,
+    },
+    {
+      name: 'Transport',
+      amount: 60,
+      color: '#2196F3',
+      legendFontColor: '#333',
+      legendFontSize: 13,
+    },
+    {
+      name: 'Rent',
+      amount: 400,
+      color: '#FF9800',
+      legendFontColor: '#333',
+      legendFontSize: 13,
+    },
+    {
+      name: 'Education',
+      amount: 200,
+      color: '#E91E63',
+      legendFontColor: '#333',
+      legendFontSize: 13,
+    },
+    {
+      name: 'Other',
+      amount: 50,
+      color: '#9C27B0',
+      legendFontColor: '#333',
+      legendFontSize: 13,
+    },
+  ];
 
   if (loading) {
     return (
@@ -128,11 +171,9 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.headerButtons}>
-         <TouchableOpacity onPress={() => router.push('/settings')}>
-          <Ionicons name="settings-outline" size={26} color="#333" />
-        </TouchableOpacity>
-
-
+          <TouchableOpacity onPress={() => router.push('/settings')}>
+            <Ionicons name="settings-outline" size={26} color="#333" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={26} color="#F44336" style={{ marginLeft: 16 }} />
           </TouchableOpacity>
@@ -162,7 +203,50 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Calendar Section */}
+      {/* 🧮 Allowance Tracker */}
+      <View style={styles.allowanceCard}>
+        <Text style={styles.sectionTitle}>🎓 Monthly Allowance</Text>
+        <Text style={styles.allowanceText}>Allowance: ${monthlyAllowance}</Text>
+        <Text style={styles.allowanceText}>Spent: ${totalExpense.toFixed(2)}</Text>
+        <Text
+          style={[
+            styles.allowanceText,
+            { color: remaining >= 0 ? '#4CAF50' : '#F44336', fontWeight: 'bold' },
+          ]}
+        >
+          Remaining: ${remaining >= 0 ? remaining.toFixed(2) : 0}
+        </Text>
+        <View style={styles.progressBarBackground}>
+          <View
+            style={[
+              styles.progressBarFill,
+              { width: `${Math.min((totalExpense / monthlyAllowance) * 100, 100)}%` },
+            ]}
+          />
+        </View>
+      </View>
+
+      {/* 🥧 Expense Breakdown */}
+      <View style={styles.chartCard}>
+        <Text style={styles.sectionTitle}>Expense Breakdown</Text>
+        <PieChart
+          data={chartData}
+          width={screenWidth - 40}
+          height={220}
+          chartConfig={{
+            backgroundGradientFrom: '#fff',
+            backgroundGradientTo: '#fff',
+            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+            strokeWidth: 2,
+          }}
+          accessor="amount"
+          backgroundColor="transparent"
+          paddingLeft="15"
+          absolute
+        />
+      </View>
+
+      {/* 📅 Calendar */}
       <View style={styles.calendarSection}>
         <Text style={styles.sectionTitle}>📅 Calendar</Text>
         <Calendar
@@ -185,7 +269,7 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
-      {/* Transactions */}
+      {/* Recent Transactions */}
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
         <TouchableOpacity
@@ -200,9 +284,7 @@ export default function HomeScreen() {
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📊</Text>
           <Text style={styles.emptyText}>No transactions yet</Text>
-          <Text style={styles.emptySubtext}>
-            Add your first transaction to get started!
-          </Text>
+          <Text style={styles.emptySubtext}>Add your first transaction to get started!</Text>
           <TouchableOpacity
             style={styles.emptyButton}
             onPress={() => router.push('/(tabs)/add-transaction')}
@@ -290,6 +372,37 @@ const styles = StyleSheet.create({
   incomeText: { fontSize: 16, fontWeight: 'bold', color: '#4CAF50' },
   expenseText: { fontSize: 16, fontWeight: 'bold', color: '#F44336' },
   balanceText: { fontSize: 16, fontWeight: 'bold' },
+
+  // New Styles
+  allowanceCard: {
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    marginBottom: 15,
+    borderRadius: 12,
+    padding: 16,
+    elevation: 3,
+  },
+  allowanceText: { fontSize: 16, color: '#333', marginBottom: 4 },
+  progressBarBackground: {
+    width: '100%',
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+  },
+  progressBarFill: {
+    height: 10,
+    backgroundColor: '#66BB6A',
+    borderRadius: 5,
+  },
+  chartCard: {
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
+    elevation: 3,
+  },
+
   calendarSection: {
     backgroundColor: 'white',
     marginHorizontal: 20,
