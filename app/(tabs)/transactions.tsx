@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   ScrollView,
@@ -7,20 +7,31 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as TxStore from '../services/transactionsStore';
+import { getTransactions } from '../services/transactionService';
 
 export default function TransactionsScreen() {
-  const [filter, setFilter] = useState('All');
-  const [transactions, setTransactions] = useState([
-    { id: 1, name: "Domino's Pizza", category: 'Food', amount: -25.50, date: 'April 20', type: 'Expense', icon: '🍕' },
-    { id: 2, name: 'Uber', category: 'Transport', amount: -18.30, date: 'April 18', type: 'Expense', icon: '🚗' },
-    { id: 3, name: 'Textbook', category: 'Tuition', amount: -95.00, date: 'April 15', type: 'Expense', icon: '📚' },
-    { id: 4, name: 'Part-time Job', category: 'Income', amount: 300.00, date: 'April 14', type: 'Income', icon: '💼' },
-    { id: 5, name: 'Netflix', category: 'Entertainment', amount: -15.99, date: 'April 12', type: 'Expense', icon: '🎬' },
-    { id: 6, name: 'Salary', category: 'Income', amount: 2000.00, date: 'April 1', type: 'Income', icon: '💰' },
-  ]);
+  const [filter, setFilter] = useState<'All' | 'Income' | 'Expense' | 'Food' | 'Rent'>('All');
+const [transactions, setTransactions] = useState<any[]>([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
 
-  const filterButtons = ['All', 'Income', 'Expense', 'Food', 'Rent'];
+useEffect(() => {
+  (async () => {
+    try {
+      setLoading(true);
+      const data = await getTransactions(); // GET /transactions
+      setTransactions(data || []);
+      setError(null);
+    } catch (e: any) {
+      console.error('Failed to load transactions', e?.message || e);
+      setError('Could not load transactions.');
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, []);
+
+  const filterButtons = ['All', 'Income', 'Expense', 'Food', 'Rent'] as const;
 
   const filteredTransactions = transactions.filter(t => {
     if (filter === 'All') return true;
@@ -37,20 +48,7 @@ export default function TransactionsScreen() {
       .filter(t => t.type === 'Expense')
       .reduce((sum, t) => sum + t.amount, 0)
   );
-  useEffect(() => {
-    let mounted = true;
 
-    TxStore.getAll().then(stored => {
-      if (!mounted) return;
-      if (stored.length) setTransactions(stored as any);
-    });
-
-    const off = TxStore.onTransactionsChanged(next => {
-      setTransactions(next as any);
-    });
-
-    return () => { mounted = false; off(); };
-  }, []);
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Transactions</Text>
@@ -85,15 +83,15 @@ export default function TransactionsScreen() {
       {/* Transaction List */}
       <FlatList
         data={filteredTransactions}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item, index) => (item._id ? String(item._id) : String(index))}
         contentContainerStyle={styles.listContainer}
         renderItem={({ item }) => (
           <View style={styles.transactionCard}>
             <View style={styles.iconContainer}>
-              <Text style={styles.icon}>{item.icon}</Text>
+              <Text style={styles.icon}>{item.type === 'Income' ? '💰' : '💸'}</Text>
             </View>
             <View style={styles.transactionInfo}>
-              <Text style={styles.transactionName}>{item.name}</Text>
+              <Text style={styles.transactionName}>{item.description || item.category}</Text>
               <Text style={styles.transactionCategory}>{item.category}</Text>
             </View>
             <View style={styles.transactionRight}>
@@ -105,7 +103,12 @@ export default function TransactionsScreen() {
               >
                 {item.type === 'Income' ? '+' : ''}${Math.abs(item.amount).toFixed(2)}
               </Text>
-              <Text style={styles.transactionDate}>{item.date}</Text>
+              <Text style={styles.transactionDate}>
+                {item.date ? new Date(item.date).toLocaleDateString()
+                : item.createdAt ? new Date(item.createdAt).toLocaleDateString()
+                : ''}
+</Text>
+
             </View>
           </View>
         )}

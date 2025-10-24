@@ -1,20 +1,20 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  StyleSheet, 
   TouchableOpacity,
-  View
+  RefreshControl,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import {
+import { 
+  getTransactions, 
   getTransactionStats,
-  getTransactions,
-  type Transaction
+  type Transaction 
 } from '../services/transactionService';
 
 export default function HomeScreen() {

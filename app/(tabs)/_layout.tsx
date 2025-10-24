@@ -72,6 +72,13 @@ export default function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="cashflow"
+        options={{
+          title: 'Cash Flow',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📊</Text>,
+        }}
+      />
     </Tabs>
   );
 }
