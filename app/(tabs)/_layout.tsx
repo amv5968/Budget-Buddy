@@ -1,17 +1,22 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, useColorScheme } from 'react-native';
 
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#66BB6A',
-        tabBarInactiveTintColor: '#999',
+        tabBarInactiveTintColor: isDark ? '#808080' : '#999',
         tabBarStyle: {
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+          backgroundColor: isDark ? '#1E1E1E' : '#fff',
+          borderTopColor: isDark ? '#333' : '#e0e0e0',
         },
       }}
     >
@@ -65,6 +70,15 @@ export default function TabLayout() {
         options={{
           title: 'Cash Flow',
           tabBarIcon: () => <Text style={{ fontSize: 24 }}>💵</Text>,
+        }}
+      />
+
+      {/* 🔔 Notifications */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Alerts',
+          tabBarIcon: () => <Text style={{ fontSize: 24 }}>🔔</Text>,
         }}
       />
 
