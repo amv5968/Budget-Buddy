@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const auth = require('../middleware/auth');
 
@@ -7,6 +8,8 @@ const router = express.Router();
 router.post('/', auth, async (req, res) => {
   try {
     const { type, category, amount, description, date } = req.body;
+
+    console.log('➕ Creating transaction:', { type, category, amount, userId: req.userId });
 
     if (!type || !category || amount === undefined) {
       return res.status(400).json({ error: 'Required fields missing' });
@@ -22,9 +25,10 @@ router.post('/', auth, async (req, res) => {
     });
 
     await transaction.save();
+    console.log('✅ Transaction saved:', transaction);
     res.status(201).json(transaction);
   } catch (error) {
-    console.error('Transaction creation error:', error);
+    console.error('❌ Transaction creation error:', error);
     res.status(500).json({ error: 'Server error creating transaction' });
   }
 });
@@ -43,18 +47,27 @@ router.get('/', auth, async (req, res) => {
 
 router.get('/stats', auth, async (req, res) => {
   try {
-    const incomeResult = await Transaction.aggregate([
-      { $match: { userId: req.userId, type: 'Income' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
+    console.log('📊 Fetching stats for userId:', req.userId);
+    
+    // Get all transactions for this user
+    const allTransactions = await Transaction.find({ userId: req.userId });
+    console.log('📝 Total transactions found:', allTransactions.length);
+    
+    // Calculate income and expense
+    let totalIncome = 0;
+    let totalExpense = 0;
+    
+    allTransactions.forEach(transaction => {
+      console.log(`Transaction: ${transaction.type} - $${transaction.amount}`);
+      if (transaction.type === 'Income') {
+        totalIncome += transaction.amount;
+      } else if (transaction.type === 'Expense') {
+        totalExpense += Math.abs(transaction.amount);
+      }
+    });
 
-    const expenseResult = await Transaction.aggregate([
-      { $match: { userId: req.userId, type: 'Expense' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
-
-    const totalIncome = incomeResult.length > 0 ? incomeResult[0].total : 0;
-    const totalExpense = expenseResult.length > 0 ? expenseResult[0].total : 0;
+    console.log('💰 Total Income:', totalIncome);
+    console.log('💸 Total Expense:', totalExpense);
 
     res.json({
       totalIncome,
@@ -77,11 +90,11 @@ router.put('/:id', auth, async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!updated) {
+    if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    res.json(updated);
+    res.json(transaction);
   } catch (error) {
     console.error('Update transaction error:', error);
     res.status(500).json({ error: 'Server error updating transaction' });

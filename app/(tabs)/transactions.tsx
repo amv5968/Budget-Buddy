@@ -1,20 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
   ActivityIndicator,
   Alert,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { 
-  getTransactions, 
-  updateTransaction, 
-  deleteTransaction, 
-  type Transaction 
+import { useTheme } from '../../context/ThemeContext';
+import {
+  deleteTransaction,
+  getTransactions,
+  updateTransaction,
+  type Transaction
 } from '../services/transactionService';
 
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
@@ -32,6 +35,8 @@ const EXPENSE_CATEGORIES = [
 ];
 
 export default function TransactionsScreen() {
+  const { colors } = useTheme();
+  const router = useRouter();
   const [filter, setFilter] = useState('All');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,10 +148,158 @@ export default function TransactionsScreen() {
     );
   };
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { justifyContent: 'center', alignItems: 'center' },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 60,
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+      backgroundColor: colors.cardBackground,
+    },
+    addButton: {
+      padding: 8,
+    },
+    backButton: { marginBottom: 16 },
+    backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+    title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: colors.text },
+    headerText: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    filterContainer: {
+      backgroundColor: colors.cardBackground,
+      paddingHorizontal: 20,
+      paddingBottom: 15,
+      maxHeight: 50,
+    },
+    filterButton: {
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+      marginRight: 10,
+    },
+    filterButtonActive: { backgroundColor: colors.primary },
+    filterText: { color: colors.textSecondary, fontWeight: '600' },
+    filterTextActive: { color: 'white' },
+    listContainer: { padding: 20 },
+    transactionCard: {
+      backgroundColor: colors.cardBackground,
+      padding: 15,
+      borderRadius: 12,
+      marginBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    iconContainer: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 15,
+    },
+    icon: { fontSize: 24 },
+    transactionInfo: { flex: 1 },
+    transactionName: { fontSize: 16, fontWeight: '600', marginBottom: 4, color: colors.text },
+    transactionCategory: { fontSize: 13, color: colors.textSecondary },
+    transactionRight: { alignItems: 'flex-end' },
+    transactionAmount: { fontSize: 18, fontWeight: 'bold', marginBottom: 2 },
+    transactionDate: { fontSize: 12, color: colors.textSecondary },
+    summaryFooter: {
+      backgroundColor: colors.cardBackground,
+      flexDirection: 'row',
+      paddingVertical: 20,
+      paddingHorizontal: 40,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    summaryItem: { flex: 1, alignItems: 'center' },
+    summaryValue: { fontSize: 24, fontWeight: 'bold', color: colors.income },
+    summaryLabel: { fontSize: 14, color: colors.textSecondary },
+    summaryDivider: { width: 1, backgroundColor: colors.border, marginHorizontal: 20 },
+    typeContainer: { flexDirection: 'row', padding: 20, gap: 12 },
+    typeButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      backgroundColor: colors.cardBackground,
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    typeButtonActive: { backgroundColor: '#66BB6A', borderColor: '#66BB6A' },
+    typeText: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
+    typeTextActive: { color: 'white' },
+    section: { paddingHorizontal: 20, marginBottom: 24 },
+    label: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 12 },
+    amountInput: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 10,
+      padding: 16,
+      fontSize: 28,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      color: colors.text,
+    },
+    categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    categoryButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryButtonActive: {
+      backgroundColor: colors.primary + '20',
+      borderColor: colors.primary,
+    },
+    categoryText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+    categoryTextActive: { color: colors.primary, fontWeight: '600' },
+    descriptionInput: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 10,
+      padding: 16,
+      fontSize: 16,
+      color: colors.text,
+      textAlignVertical: 'top',
+      minHeight: 100,
+    },
+    submitButton: {
+      backgroundColor: '#66BB6A',
+      marginHorizontal: 20,
+      marginBottom: 12,
+      padding: 18,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    deleteButton: {
+      backgroundColor: colors.danger,
+      marginHorizontal: 20,
+      marginBottom: 40,
+      padding: 18,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    submitText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+    disabledButton: { opacity: 0.7 },
+  });
+
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color="#66BB6A" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -265,7 +418,15 @@ export default function TransactionsScreen() {
   // 🔹 Otherwise show list mode
   return (
     <View style={styles.container}>
-      <Text style={styles.headerText}>Transactions</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Transactions</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => router.push('/(tabs)/add-transaction')}
+        >
+          <Ionicons name="add-circle" size={28} color="#66BB6A" />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         horizontal
@@ -313,7 +474,7 @@ export default function TransactionsScreen() {
               <Text
                 style={[
                   styles.transactionAmount,
-                  { color: item.type === 'Income' ? '#4CAF50' : '#F44336' },
+                  { color: item.type === 'Income' ? colors.income : colors.expense },
                 ]}
               >
                 {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
@@ -333,7 +494,7 @@ export default function TransactionsScreen() {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: '#F44336' }]}>
+          <Text style={[styles.summaryValue, { color: colors.expense }]}>
             ${totalExpense.toFixed(0)}
           </Text>
           <Text style={styles.summaryLabel}>Expenses</Text>
@@ -342,147 +503,3 @@ export default function TransactionsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { justifyContent: 'center', alignItems: 'center' },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: 'white',
-  },
-  backButton: { marginBottom: 16 },
-  backText: { fontSize: 16, color: '#2196F3', fontWeight: '600' },
-  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20 },
-  headerText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: 'white',
-  },
-  filterContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    maxHeight: 50,
-  },
-  filterButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 10,
-  },
-  filterButtonActive: { backgroundColor: '#2196F3' },
-  filterText: { color: '#666', fontWeight: '600' },
-  filterTextActive: { color: 'white' },
-  listContainer: { padding: 20 },
-  transactionCard: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  icon: { fontSize: 24 },
-  transactionInfo: { flex: 1 },
-  transactionName: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  transactionCategory: { fontSize: 13, color: '#666' },
-  transactionRight: { alignItems: 'flex-end' },
-  transactionAmount: { fontSize: 18, fontWeight: 'bold', marginBottom: 2 },
-  transactionDate: { fontSize: 12, color: '#999' },
-  summaryFooter: {
-    backgroundColor: 'white',
-    flexDirection: 'row',
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: 24, fontWeight: 'bold', color: '#4CAF50' },
-  summaryLabel: { fontSize: 14, color: '#666' },
-  summaryDivider: { width: 1, backgroundColor: '#eee', marginHorizontal: 20 },
-  typeContainer: { flexDirection: 'row', padding: 20, gap: 12 },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-  },
-  typeButtonActive: { backgroundColor: '#66BB6A', borderColor: '#66BB6A' },
-  typeText: { fontSize: 16, fontWeight: '600', color: '#666' },
-  typeTextActive: { color: 'white' },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  label: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12 },
-  amountInput: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333',
-  },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  categoryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  categoryButtonActive: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#2196F3',
-  },
-  categoryText: { fontSize: 14, color: '#666', fontWeight: '500' },
-  categoryTextActive: { color: '#2196F3', fontWeight: '600' },
-  descriptionInput: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 16,
-    color: '#333',
-    textAlignVertical: 'top',
-    minHeight: 100,
-  },
-  submitButton: {
-    backgroundColor: '#66BB6A',
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  deleteButton: {
-    backgroundColor: '#F44336',
-    marginHorizontal: 20,
-    marginBottom: 40,
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  submitText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  disabledButton: { opacity: 0.7 },
-});

@@ -1,14 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface Notification {
   id: string;
@@ -22,6 +24,7 @@ interface Notification {
 
 const NotificationsScreen: React.FC = () => {
   const { colors } = useTheme();
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: '1',
@@ -115,6 +118,24 @@ const NotificationsScreen: React.FC = () => {
     );
   };
 
+  const clearNotification = (id: string) => {
+    Alert.alert(
+      'Clear Notification',
+      'Are you sure you want to clear this notification?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            setNotifications(prev => prev.filter(n => n.id !== id));
+            Alert.alert('✅ Success', 'Notification cleared');
+          },
+        },
+      ]
+    );
+  };
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'success':
@@ -154,6 +175,11 @@ const NotificationsScreen: React.FC = () => {
       paddingHorizontal: 20,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+    },
+    backButton: {
+      marginBottom: 10,
+      padding: 8,
+      alignSelf: 'flex-start',
     },
     headerRow: {
       flexDirection: 'row',
@@ -260,6 +286,14 @@ const NotificationsScreen: React.FC = () => {
       color: colors.text,
       flex: 1,
     },
+    notificationActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    notificationActionIcon: {
+      fontSize: 16,
+    },
     notificationDate: {
       fontSize: 11,
       color: colors.textSecondary,
@@ -307,6 +341,12 @@ const NotificationsScreen: React.FC = () => {
     <View style={dynamicStyles.container}>
       {/* Header */}
       <View style={dynamicStyles.headerSection}>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={dynamicStyles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <View style={dynamicStyles.headerRow}>
           <Text style={dynamicStyles.title}>🔔 Notifications</Text>
           {unreadCount > 0 && (
@@ -405,9 +445,14 @@ const NotificationsScreen: React.FC = () => {
               <View style={dynamicStyles.notificationHeader}>
                 <Text style={dynamicStyles.notificationIcon}>{notification.icon}</Text>
                 <Text style={dynamicStyles.notificationTitle}>{notification.title}</Text>
-                <Text style={dynamicStyles.notificationDate}>
-                  {formatDate(notification.date)}
-                </Text>
+                <View style={dynamicStyles.notificationActions}>
+                  <TouchableOpacity onPress={() => clearNotification(notification.id)}>
+                    <Text style={[dynamicStyles.notificationActionIcon, { color: colors.danger }]}>🗑️</Text>
+                  </TouchableOpacity>
+                  <Text style={dynamicStyles.notificationDate}>
+                    {formatDate(notification.date)}
+                  </Text>
+                </View>
               </View>
               <Text style={dynamicStyles.notificationMessage}>{notification.message}</Text>
               {!notification.read && (

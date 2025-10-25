@@ -8,20 +8,31 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { addGoal } from '../services/goalService';
 
 const GOAL_ICONS = [
-  'ðŸŽ¯', 'ðŸ ', 'ðŸš—', 'âœˆï¸', 'ðŸ’', 'ðŸŽ“',
-  'ðŸ’°', 'ðŸ“±', 'ðŸ’»', 'ðŸŽ®', 'ðŸ–ï¸', 'âš¡'
+  '\u{1F3AF}', // target
+  '\u{1F3E0}', // house
+  '\u{1F697}', // car
+  '\u{2708}\u{FE0F}', // airplane
+  '\u{1F48D}', // ring
+  '\u{1F393}', // graduation cap
+  '\u{1F4B0}', // money bag
+  '\u{1F4F1}', // phone
+  '\u{1F4BB}', // laptop
+  '\u{1F3AE}', // game controller
+  '\u{1F3D6}\u{FE0F}', // beach
+  '\u{26A1}', // lightning
 ];
 
 export default function AddGoalScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('ðŸŽ¯');
+  const [selectedIcon, setSelectedIcon] = useState(GOAL_ICONS[0]);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -45,7 +56,7 @@ export default function AddGoalScreen() {
 
       Alert.alert('Success', 'Goal created successfully!');
       router.back();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating goal:', error);
       const errorMessage = error.response?.data?.error || 'Failed to create goal';
       Alert.alert('Error', errorMessage);
@@ -58,7 +69,7 @@ export default function AddGoalScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>â† Back</Text>
+          <Text style={styles.backText}>{'\u{2190}'} Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Create Savings Goal</Text>
       </View>
@@ -89,9 +100,9 @@ export default function AddGoalScreen() {
       <View style={styles.section}>
         <Text style={styles.label}>Choose an Icon</Text>
         <View style={styles.iconGrid}>
-          {GOAL_ICONS.map((icon) => (
+          {GOAL_ICONS.map((icon, index) => (
             <TouchableOpacity
-              key={icon}
+              key={index}
               style={[
                 styles.iconButton,
                 selectedIcon === icon && styles.iconButtonActive,
@@ -190,6 +201,7 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 32,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   submitButton: {
     backgroundColor: '#66BB6A',

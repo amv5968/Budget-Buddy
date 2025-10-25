@@ -1,22 +1,22 @@
 import { Tabs } from 'expo-router';
-import { Text, useColorScheme } from 'react-native';
+import { Text } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { colors, theme } = useTheme();
   
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#66BB6A',
-        tabBarInactiveTintColor: isDark ? '#808080' : '#999',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
-          backgroundColor: isDark ? '#1E1E1E' : '#fff',
-          borderTopColor: isDark ? '#333' : '#e0e0e0',
+          backgroundColor: colors.cardBackground,
+          borderTopColor: colors.border,
         },
       }}
     >
@@ -73,16 +73,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 🔔 Notifications */}
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Alerts',
-          tabBarIcon: () => <Text style={{ fontSize: 24 }}>🔔</Text>,
-        }}
-      />
-
-      {/* 📘 Resources */}
+      {/*  Resources */}
       <Tabs.Screen
         name="resources"
         options={{

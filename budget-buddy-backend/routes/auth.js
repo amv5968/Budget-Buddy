@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -46,7 +47,8 @@ router.post('/signup', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        monthlyAllowance: user.monthlyAllowance || 1000
       }
     });
   } catch (error) {
@@ -88,12 +90,65 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        monthlyAllowance: user.monthlyAllowance || 1000
       }
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login' });
+  }
+});
+
+// Get user profile with monthly allowance
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      monthlyAllowance: user.monthlyAllowance || 1000
+    });
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ error: 'Server error fetching profile' });
+  }
+});
+
+// Update monthly allowance
+router.patch('/monthly-allowance', auth, async (req, res) => {
+  try {
+    const { monthlyAllowance } = req.body;
+
+    if (typeof monthlyAllowance !== 'number' || monthlyAllowance <= 0) {
+      return res.status(400).json({ error: 'Invalid monthly allowance amount' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { monthlyAllowance },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      monthlyAllowance: user.monthlyAllowance
+    });
+  } catch (error) {
+    console.error('Update allowance error:', error);
+    res.status(500).json({ error: 'Server error updating allowance' });
   }
 });
 
