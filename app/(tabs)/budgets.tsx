@@ -1,19 +1,21 @@
-import React, { useState, useCallback } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
+  FlatList,
   RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 import { getBudgets, type Budget } from '../services/budgetService';
 
 export default function BudgetsScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,10 +54,141 @@ export default function BudgetsScreen() {
     return '#4CAF50';
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centerContent: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 20,
+      backgroundColor: colors.cardBackground,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    addButton: {
+      backgroundColor: '#66BB6A',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    addButtonText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: 14,
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 40,
+    },
+    emptyIcon: {
+      fontSize: 64,
+      marginBottom: 16,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 24,
+    },
+    emptyButton: {
+      backgroundColor: '#66BB6A',
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    emptyButtonText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    listContent: {
+      padding: 20,
+    },
+    budgetCard: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    budgetHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    budgetInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    budgetIcon: {
+      fontSize: 32,
+      marginRight: 12,
+    },
+    budgetCategory: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    budgetAmount: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    budgetPercentage: {
+      alignItems: 'flex-end',
+    },
+    percentageText: {
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    progressBarContainer: {
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: 8,
+    },
+    progressBar: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    remainingText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      textAlign: 'right',
+    },
+  });
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#66BB6A" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -66,7 +199,7 @@ export default function BudgetsScreen() {
         <Text style={styles.title}>Budgets</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push('//add-budget')}
+          onPress={() => router.push('/add-budget')}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
@@ -79,7 +212,7 @@ export default function BudgetsScreen() {
           <Text style={styles.emptySubtext}>Create a budget to track your spending!</Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => router.push('//add-budget')}
+            onPress={() => router.push('/add-budget')}
           >
             <Text style={styles.emptyButtonText}>Create Budget</Text>
           </TouchableOpacity>
@@ -98,7 +231,7 @@ export default function BudgetsScreen() {
             return (
               <TouchableOpacity
                 style={styles.budgetCard}
-                onPress={() => router.push(`//edit-budget?id=${item._id}`)}
+                onPress={() => router.push(`/edit-budget?id=${item._id}`)}
               >
                 <View style={styles.budgetHeader}>
                   <View style={styles.budgetInfo}>
@@ -141,133 +274,3 @@ export default function BudgetsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: 'white',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    backgroundColor: '#66BB6A',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  emptyButton: {
-    backgroundColor: '#66BB6A',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  emptyButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  listContent: {
-    padding: 20,
-  },
-  budgetCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  budgetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  budgetInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  budgetIcon: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  budgetCategory: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  budgetAmount: {
-    fontSize: 14,
-    color: '#666',
-  },
-  budgetPercentage: {
-    alignItems: 'flex-end',
-  },
-  percentageText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  remainingText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'right',
-  },
-});
