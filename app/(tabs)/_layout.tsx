@@ -1,14 +1,18 @@
-import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { Image, Text, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function TabLayout() {
-  const { colors, theme } = useTheme();
-  
+  const { colors } = useTheme();
+  const router = useRouter();
+
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerTitleAlign: 'center',
+        headerStyle: { backgroundColor: colors.cardBackground },
+        headerTintColor: colors.text,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
@@ -26,14 +30,36 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: () => <Text style={{ fontSize: 24 }}>🏠</Text>,
+
+          // 👤 Profile icon in top-right
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/profile')}
+              style={{ marginRight: 16 }}
+            >
+              {/* Option 1: Emoji icon */}
+              {/* <Text style={{ fontSize: 22, color: colors.primary }}>👤</Text> */}
+
+              {/* Option 2: Small profile image */}
+              <Image
+                source={{ uri: 'https://i.pravatar.cc/100' }} // replace with user avatar if you have one
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              />
+            </TouchableOpacity>
+          ),
         }}
       />
 
-      {/* Hidden routes */}
+      {/* Hidden & normal tabs (unchanged) */}
       <Tabs.Screen name="add-transaction" options={{ href: null }} />
       <Tabs.Screen name="edit-transaction" options={{ href: null }} />
 
-      {/* 💰 Budgets */}
       <Tabs.Screen
         name="budgets"
         options={{
@@ -44,7 +70,6 @@ export default function TabLayout() {
       <Tabs.Screen name="add-budget" options={{ href: null }} />
       <Tabs.Screen name="edit-budget" options={{ href: null }} />
 
-      {/* 🎯 Goals */}
       <Tabs.Screen
         name="goals"
         options={{
@@ -55,7 +80,6 @@ export default function TabLayout() {
       <Tabs.Screen name="add-goal" options={{ href: null }} />
       <Tabs.Screen name="edit-goal" options={{ href: null }} />
 
-      {/* 💸 Transactions */}
       <Tabs.Screen
         name="transactions"
         options={{
@@ -64,7 +88,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 💵 Cash Flow */}
       <Tabs.Screen
         name="cash-flow"
         options={{
@@ -73,7 +96,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/*  Resources */}
       <Tabs.Screen
         name="resources"
         options={{
@@ -81,6 +103,9 @@ export default function TabLayout() {
           tabBarIcon: () => <Text style={{ fontSize: 24 }}>📘</Text>,
         }}
       />
+
+      {/* 👤 Hidden profile screen */}
+      <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );
 }
