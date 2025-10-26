@@ -1,5 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import {
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -13,14 +15,31 @@ export default function ProfileScreen() {
   const { colors, theme } = useTheme();
   const router = useRouter();
 
+  const handleNavigate = (path: string) => {
+    Haptics.selectionAsync();
+    router.push(path);
+  };
+
+  const handleLogout = () => {
+    Haptics.selectionAsync();
+    Alert.alert('Confirm Logout', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: () => console.log('User logged out'),
+      },
+    ]);
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
       {/* 🔙 Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <View style={[styles.header, { backgroundColor: colors.cardBackground }]}>
+        <TouchableOpacity onPress={() => router.push('/home')} style={styles.backButton}>
           <Text style={[styles.backText, { color: colors.primary }]}>← Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
@@ -39,12 +58,17 @@ export default function ProfileScreen() {
       </View>
 
       {/* ✏️ Account Settings */}
-      <View style={styles.section}>
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: colors.cardBackground, borderColor: colors.border },
+        ]}
+      >
         <Text style={[styles.label, { color: colors.text }]}>Account Settings</Text>
 
         <TouchableOpacity
           style={[styles.option, { borderColor: colors.border }]}
-          onPress={() => router.push('/edit-username')}
+          onPress={() => router.push('/profile-tabs/edit-username')}
         >
           <Text style={[styles.optionText, { color: colors.text }]}>
             Edit Username
@@ -53,43 +77,45 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={[styles.option, { borderColor: colors.border }]}
-          onPress={() => router.push('/edit-password')}
+          onPress={() => router.push('/profile-tabs/edit-password')}
         >
           <Text style={[styles.optionText, { color: colors.text }]}>
             Change Password
           </Text>
         </TouchableOpacity>
+
       </View>
 
-      {/* ⚙️ Other Options */}
-      <View style={styles.section}>
+      {/* ⚙️ More Options */}
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: colors.cardBackground, borderColor: colors.border },
+        ]}
+      >
         <Text style={[styles.label, { color: colors.text }]}>More Options</Text>
 
         <TouchableOpacity
           style={[styles.option, { borderColor: colors.border }]}
-          onPress={() => router.push('/settings')}
+          onPress={() => handleNavigate('/settings')}
         >
           <Text style={[styles.optionText, { color: colors.text }]}>Settings</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.option, { borderColor: colors.border }]}
-          onPress={() => router.push('/help')}
+          onPress={() => handleNavigate('/help')}
         >
-          <Text style={[styles.optionText, { color: colors.text }]}>
-            Help & Support
-          </Text>
+          <Text style={[styles.optionText, { color: colors.text }]}>Help & Support</Text>
         </TouchableOpacity>
       </View>
 
       {/* 🚪 Logout */}
       <TouchableOpacity
         style={[styles.logoutButton, { backgroundColor: colors.primary }]}
-        onPress={() => alert('Logging out...')}
+        onPress={handleLogout}
       >
-        <Text style={[styles.logoutText, { color: colors.buttonText }]}>
-          Log Out
-        </Text>
+        <Text style={[styles.logoutText, { color: '#fff' }]}>Log Out</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -105,6 +131,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   backButton: {
     marginBottom: 12,
@@ -139,9 +170,9 @@ const styles = StyleSheet.create({
   section: {
     marginHorizontal: 20,
     marginBottom: 30,
-    backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 8,
