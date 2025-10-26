@@ -75,19 +75,7 @@ export default function TabLayout() {
           tabBarIcon: () => <Text style={{ fontSize: 24 }}>💵</Text>,
         }}
       />
-      {/* 🤖 AI Buddy */}
-      <Tabs.Screen
-        name="ai-chat"
-        options={{
-          title: 'AI Buddy',
-        tabBarIcon: ({ color, size }) => (
-      <Ionicons name="chatbubble-ellipses-outline" size={22} color={color} 
-      />
       
-       ),
-      }}
-      />
-
       {/*  Resources */}
       <Tabs.Screen
         name="resources"
@@ -96,12 +84,15 @@ export default function TabLayout() {
           tabBarIcon: () => <Text style={{ fontSize: 24 }}>📘</Text>,
         }}
       />
-      <Tabs.Screen
-        name="cashflow"
-        options={{
-          title: 'Cash Flow',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📊</Text>,
-        }}
+        {/* 🤖 AI Buddy */}
+        <Tabs.Screen
+         name="ai-chats"
+         options={{
+           title: 'AI Buddy',
+          tabBarIcon: ({ color, size }) => (
+         <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />
+          ),
+         }}
       />
     </Tabs>
   );
