@@ -1,58 +1,51 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
-
-const REMINDER_KEY = 'bb.reminders.v1';
+import api from './api';
 
 export type Reminder = {
   id: string;
-  date: string;      // '2025-10-26'
-  time: string;      // '09:00'
-  message: string;   // 'Pay rent'
+  date: string;   // 'YYYY-MM-DD'
+  time: string;   // 'HH:MM'
+  message: string;
 };
 
-async function loadAll(): Promise<Reminder[]> {
-  const raw = await AsyncStorage.getItem(REMINDER_KEY);
-  if (!raw) return [];
+// Get ALL reminders (for calendar dots)
+export async function getReminders(): Promise<Reminder[]> {
   try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
+    console.log('[getReminders] fetching all reminders from backend...');
+    const res = await api.get('/reminders');
+    console.log('[getReminders] backend response:', res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error('[getReminders] error:', error.response?.data || error.message);
+    throw error;
   }
 }
 
-async function saveAll(list: Reminder[]) {
-  await AsyncStorage.setItem(REMINDER_KEY, JSON.stringify(list));
-}
-
-// create + persist a new reminder
-export async function addReminder(date: string, time: string, message: string): Promise<Reminder> {
-  const all = await loadAll();
-  const newOne: Reminder = {
-    id: uuidv4(),
-    date,
-    time,
-    message,
-  };
-  all.push(newOne);
-  await saveAll(all);
-  return newOne;
-}
-
-// get all reminders (for calendar dots, etc.)
-export async function getReminders(): Promise<Reminder[]> {
-  return loadAll();
-}
-
-// get reminders for a single day (to show in modal)
+// Get reminders for a single date
 export async function getRemindersForDate(date: string): Promise<Reminder[]> {
-  const all = await loadAll();
-  return all.filter(r => r.date === date);
+  try {
+    console.log('[getRemindersForDate] fetching for date:', date);
+    const res = await api.get(`/reminders/${date}`);
+    console.log('[getRemindersForDate] backend response:', res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error('[getRemindersForDate] error:', error.response?.data || error.message);
+    throw error;
+  }
 }
 
-// delete reminder (for cancel/edit later)
-export async function deleteReminder(id: string): Promise<void> {
-  const all = await loadAll();
-  const filtered = all.filter(r => r.id !== id);
-  await saveAll(filtered);
+// Add new reminder
+export async function addReminder(
+  date: string,
+  time: string,
+  message: string
+): Promise<Reminder> {
+  try {
+    console.log('[addReminder] sending to backend:', { date, time, message });
+    const res = await api.post('/reminders', { date, time, message });
+    console.log('[addReminder] backend response:', res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error('[addReminder] error:', error.response?.data || error.message);
+    throw error;
+  }
 }

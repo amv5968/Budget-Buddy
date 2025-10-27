@@ -96,11 +96,25 @@ export default function HomeScreen() {
         await loadAllowance();
         await loadData();
         await loadAllRemindersForCalendar();
+    // After loading reminders from backend
+      const allReminders = await getReminders();
+
+    // Re-schedule local notifications for all upcoming reminders
+        for (const r of allReminders) {
+      const [hh, mm] = r.time.split(':');
+      const [yyyy, mon, dd] = r.date.split('-');
+      const fireDate = new Date(Number(yyyy), Number(mon) - 1, Number(dd), Number(hh), Number(mm));
+
+      if (fireDate.getTime() > Date.now()) {
+      await scheduleReminderNotification(fireDate, r.message);
+        }
+      }
+
       };
       refreshDashboard();
       setLastAlertPercentage(0);
     }, [])
-  );
+    );
 
   // --- load allowance from backend ---
   const loadAllowance = async () => {
