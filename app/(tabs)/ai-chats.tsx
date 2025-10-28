@@ -1,17 +1,29 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-// Definition of ChatMsg.
+// ⬇️ NEW IMPORTS
+import { getUserProfile } from '../services/authService';
+import {
+  buildAIBuddyMessages,
+  buildInsights,
+} from '../services/insightsService';
+import {
+  getTransactions,
+  getTransactionStats,
+  Transaction,
+} from '../services/transactionService';
+
+// Chat message shape
 type ChatMsg = {
   from: 'bot' | 'you';
   text: string;
@@ -20,7 +32,7 @@ type ChatMsg = {
 export default function AiBuddyScreen() {
   const router = useRouter();
 
-  // Messages are typed as ChatMsg[]
+  // chat UI state
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
       from: 'bot',
@@ -32,28 +44,82 @@ export default function AiBuddyScreen() {
         '• "How close am I to my savings goal?"',
     },
   ]);
-
   const [draft, setDraft] = useState('');
 
-  // handleSend builds an explicit ChatMsg[]
-  const handleSend = () => {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
+  // financial data state
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [monthlyAllowance, setMonthlyAllowance] = useState<number>(1000);
 
-    const newMessages: ChatMsg[] = [
-      ...messages,
-      { from: 'you', text: trimmed },
-      {
-        from: 'bot',
-        text:
-          "Thanks! (Demo reply)\nIn the final version I'd look at your spending data " +
-          'and give you insights right here.',
-      },
-    ];
+  // load user's transactions + allowance on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const tx = await getTransactions();
+        setTransactions(tx);
 
-    setMessages(newMessages);
-    setDraft('');
-  };
+        const profile = await getUserProfile();
+        if (profile?.monthlyAllowance != null) {
+          setMonthlyAllowance(profile.monthlyAllowance);
+        }
+
+        // optional, not currently used but might warm the cache
+        await getTransactionStats();
+      } catch (err) {
+        console.warn('[AI Buddy] failed to load data:', err);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // helper: build AI reply text using insightsService
+  async function generateReply(userQuestion: string): Promise<string> {
+    // figure out dates (this month vs last month)
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1); // e.g. Oct 1
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); // e.g. Sep 1
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1); // e.g. Oct 1 (acts as "end" of previous)
+
+    const insight = buildInsights(
+      transactions,
+      monthlyAllowance,
+      monthStart.toISOString(),
+      prevMonthStart.toISOString(),
+      prevMonthEnd.toISOString()
+    );
+
+    const { statusText, adviceText } = buildAIBuddyMessages(insight);
+
+    // 🔮 future: inspect userQuestion and tailor the answer.
+    // for now we always send status + advice.
+    return `${statusText}\n\n${adviceText}`;
+  }
+
+  // send button
+  
+  const handleSend = async () => {
+  const trimmed = draft.trim();
+  if (!trimmed) return;
+
+  // Clear input and show the user message once
+  setDraft('');
+  setMessages(prev => [...prev, { from: 'you', text: trimmed }]);
+
+  try {
+    // Only generate one bot reply per send
+    const reply = await generateReply(trimmed); // or buildAIBuddyMessages(), etc.
+
+    // Append ONE bot response
+    setMessages(prev => [...prev, { from: 'bot', text: reply }]);
+  } catch (err) {
+    console.error('AI Buddy error:', err);
+    setMessages(prev => [
+      ...prev,
+      { from: 'bot', text: '⚠️ Something went wrong getting the response.' },
+    ]);
+  }
+};
+;
 
   return (
     <View style={styles.screen}>
@@ -65,11 +131,11 @@ export default function AiBuddyScreen() {
 
         <Text style={styles.headerTitle}>AI Buddy</Text>
 
-        {/* spacer to balance Back button */}
+        {/* spacer to balance Back button visually */}
         <View style={{ width: 50 }} />
       </View>
 
-      {/* Chat */}
+      {/* Chat area */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -123,12 +189,11 @@ export default function AiBuddyScreen() {
   );
 }
 
-// styles
+// --- styles (unchanged from yours) ---
 const BG_APP = '#F6F6F6';
 const BG_CARD = '#FFFFFF';
 const BORDER = '#E0E0E0';
 const TEXT_MAIN = '#222';
-const TEXT_SUB = '#555';
 const ACCENT = '#2E7D32';
 
 const styles = StyleSheet.create({
@@ -185,14 +250,12 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 20,
-  },
-  botText: {
     color: TEXT_MAIN,
   },
   youText: {
-    color: TEXT_MAIN,
     fontWeight: '500',
   },
+  botText: {},
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
