@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -10,7 +10,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
+import { 
+  getAllNotifications, 
+  clearAllNotifications,
+  requestNotificationPermissions 
+} from './services/notificationService';
+import * as Notifications from 'expo-notifications';
+
+const SETTINGS_KEY = 'bb.settings.v1';
 
 interface Notification {
   id: string;
@@ -25,67 +34,113 @@ interface Notification {
 const NotificationsScreen: React.FC = () => {
   const { colors } = useTheme();
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'warning',
-      title: 'Budget Alert',
-      message: "You've spent 85% of your Food budget this month. Consider reducing dining out.",
-      date: new Date().toISOString(),
-      read: false,
-      icon: '🍔',
-    },
-    {
-      id: '2',
-      type: 'success',
-      title: 'Goal Milestone',
-      message: "Great job! You're 50% of the way to your 'Emergency Fund' goal. Keep saving!",
-      date: new Date(Date.now() - 86400000).toISOString(),
-      read: false,
-      icon: '🎯',
-    },
-    {
-      id: '3',
-      type: 'info',
-      title: 'Weekly Summary',
-      message: 'This week you spent $245 and earned $450. Your savings rate: 45.5%',
-      date: new Date(Date.now() - 86400000 * 2).toISOString(),
-      read: true,
-      icon: '📊',
-    },
-    {
-      id: '4',
-      type: 'danger',
-      title: 'Low Balance Alert',
-      message: 'Your account balance is below $50. Consider reviewing your expenses.',
-      date: new Date(Date.now() - 86400000 * 3).toISOString(),
-      read: true,
-      icon: '⚠️',
-    },
-    {
-      id: '5',
-      type: 'info',
-      title: 'New Resource Available',
-      message: 'Check out the new Penn State Student Financial Workshop this Friday at 2 PM.',
-      date: new Date(Date.now() - 86400000 * 5).toISOString(),
-      read: true,
-      icon: '📚',
-    },
-    {
-      id: '6',
-      type: 'success',
-      title: 'Income Received',
-      message: 'Your paycheck of $500 has been added to your account.',
-      date: new Date(Date.now() - 86400000 * 7).toISOString(),
-      read: true,
-      icon: '💰',
-    },
-  ]);
-
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [budgetAlerts, setBudgetAlerts] = useState(true);
   const [goalUpdates, setGoalUpdates] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNotifications();
+      loadSettings();
+    }, [])
+  );
+
+  const loadNotifications = async () => {
+    try {
+      const { delivered } = await getAllNotifications();
+      
+      const formattedNotifications: Notification[] = delivered.map((notif) => {
+        const data = notif.request.content.data as any;
+        let type: 'success' | 'warning' | 'info' | 'danger' = 'info';
+        let icon = '🔔';
+
+        // Determine type and icon based on notification data
+        if (data.type === 'transaction') {
+          type = 'success';
+          icon = '💰';
+        } else if (data.type === 'budget_alert') {
+          type = 'warning';
+          icon = '⚠️';
+        } else if (data.type === 'low_balance') {
+          type = 'danger';
+          icon = '🚨';
+        } else if (data.type === 'large_transaction') {
+          type = 'warning';
+          icon = '💸';
+        } else if (data.type === 'date_summary') {
+          type = 'info';
+          icon = '📅';
+        } else if (data.type === 'daily_summary') {
+          type = 'info';
+          icon = '📊';
+        } else if (data.type === 'weekly_summary') {
+          type = 'info';
+          icon = '📈';
+        }
+
+        return {
+          id: notif.request.identifier,
+          type,
+          title: notif.request.content.title || 'Notification',
+          message: notif.request.content.body || '',
+          date: new Date(notif.date).toISOString(),
+          read: false,
+          icon,
+        };
+      });
+
+      setNotifications(formattedNotifications.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      ));
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+      if (raw) {
+        const settings = JSON.parse(raw);
+        setNotificationsEnabled(settings.notificationsEnabled ?? true);
+        setBudgetAlerts(settings.budgetAlerts ?? true);
+        setGoalUpdates(settings.goalUpdates ?? true);
+        setWeeklySummary(settings.weeklySummary ?? true);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+      const existingSettings = raw ? JSON.parse(raw) : {};
+      
+      const updatedSettings = {
+        ...existingSettings,
+        notificationsEnabled,
+        budgetAlerts,
+        goalUpdates,
+        weeklySummary,
+      };
+
+      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
+      
+      if (!notificationsEnabled) {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+      } else {
+        await requestNotificationPermissions();
+      }
+      
+      Alert.alert('✅ Success', 'Notification settings updated');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      Alert.alert('Error', 'Failed to save settings');
+    }
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -109,7 +164,8 @@ const NotificationsScreen: React.FC = () => {
         {
           text: 'Clear',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await clearAllNotifications();
             setNotifications([]);
             Alert.alert('✅ Success', 'All notifications cleared');
           },
@@ -118,7 +174,7 @@ const NotificationsScreen: React.FC = () => {
     );
   };
 
-  const clearNotification = (id: string) => {
+  const clearNotification = async (id: string) => {
     Alert.alert(
       'Clear Notification',
       'Are you sure you want to clear this notification?',
@@ -127,9 +183,14 @@ const NotificationsScreen: React.FC = () => {
         {
           text: 'Clear',
           style: 'destructive',
-          onPress: () => {
-            setNotifications(prev => prev.filter(n => n.id !== id));
-            Alert.alert('✅ Success', 'Notification cleared');
+          onPress: async () => {
+            try {
+              await Notifications.dismissNotificationAsync(id);
+              setNotifications(prev => prev.filter(n => n.id !== id));
+              Alert.alert('✅ Success', 'Notification cleared');
+            } catch (error) {
+              console.error('Error clearing notification:', error);
+            }
           },
         },
       ]
@@ -155,8 +216,13 @@ const NotificationsScreen: React.FC = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
 
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
@@ -385,7 +451,10 @@ const NotificationsScreen: React.FC = () => {
             <Text style={dynamicStyles.settingLabel}>Enable Notifications</Text>
             <Switch
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={(value) => {
+                setNotificationsEnabled(value);
+                saveSettings();
+              }}
               trackColor={{ true: colors.primary }}
             />
           </View>
@@ -394,7 +463,10 @@ const NotificationsScreen: React.FC = () => {
             <Text style={dynamicStyles.settingLabel}>Budget Alerts</Text>
             <Switch
               value={budgetAlerts}
-              onValueChange={setBudgetAlerts}
+              onValueChange={(value) => {
+                setBudgetAlerts(value);
+                saveSettings();
+              }}
               trackColor={{ true: colors.primary }}
               disabled={!notificationsEnabled}
             />
@@ -404,7 +476,10 @@ const NotificationsScreen: React.FC = () => {
             <Text style={dynamicStyles.settingLabel}>Goal Updates</Text>
             <Switch
               value={goalUpdates}
-              onValueChange={setGoalUpdates}
+              onValueChange={(value) => {
+                setGoalUpdates(value);
+                saveSettings();
+              }}
               trackColor={{ true: colors.primary }}
               disabled={!notificationsEnabled}
             />
@@ -414,7 +489,10 @@ const NotificationsScreen: React.FC = () => {
             <Text style={dynamicStyles.settingLabel}>Weekly Summary</Text>
             <Switch
               value={weeklySummary}
-              onValueChange={setWeeklySummary}
+              onValueChange={(value) => {
+                setWeeklySummary(value);
+                saveSettings();
+              }}
               trackColor={{ true: colors.primary }}
               disabled={!notificationsEnabled}
             />
@@ -472,4 +550,3 @@ const NotificationsScreen: React.FC = () => {
 };
 
 export default NotificationsScreen;
-

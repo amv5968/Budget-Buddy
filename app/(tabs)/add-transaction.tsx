@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { addTransaction } from '../services/transactionService';
+import { notifyNewTransaction, maybeTriggerThresholdAlerts } from '../services/notificationService';
 
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
 const EXPENSE_CATEGORIES = [
@@ -49,13 +50,17 @@ export default function AddTransactionScreen() {
 
     setLoading(true);
     try {
-      await addTransaction({
+      const newTransaction = await addTransaction({
         type,
         category,
         amount: parseFloat(amount),
         description: description.trim(),
         date: new Date().toISOString(),
       });
+
+      // Trigger notifications
+      await notifyNewTransaction(newTransaction);
+      await maybeTriggerThresholdAlerts(newTransaction);
 
       Alert.alert('Success', 'Transaction added successfully!');
       router.back();

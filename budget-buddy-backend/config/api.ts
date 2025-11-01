@@ -1,65 +1,36 @@
-import axios from 'axios';
+// app/services/api.ts
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_URL =   'http://10.0.2.2:3000/api' 
+import axios from 'axios';
 
 const api = axios.create({
-
-  baseURL: API_URL,
-
+  baseURL: 'http://10.0.2.2:3000/api', // Android emulator -> your backend
   timeout: 10000,
-
-  headers: {
-
-    'Content-Type': 'application/json',
-
-  },
-
 });
 
+// Attach Authorization header automatically if we have a token
 api.interceptors.request.use(
-
   async (config) => {
-
     const token = await AsyncStorage.getItem('authToken');
 
     if (token) {
-
-      config.headers.Authorization = `Bearer ${token}`;
-
+      // If headers exists and has a set() method (AxiosHeaders in Axios 1.x)
+      if (config.headers && typeof (config.headers as any).set === 'function') {
+        (config.headers as any).set('Authorization', `Bearer ${token}`);
+      } else {
+        // Fallback for plain object style headers
+        (config.headers as any) = {
+          ...(config.headers || {}),
+          Authorization: `Bearer ${token}`,
+        };
+      }
     }
 
     return config;
-
   },
-
   (error) => {
-
     return Promise.reject(error);
-
   }
-
-);
-
-api.interceptors.response.use(
-
-  (response) => response,
-
-  async (error) => {
-
-    if (error.response?.status === 401) {
-
-      await AsyncStorage.removeItem('authToken');
-
-      await AsyncStorage.removeItem('user');
-
-    }
-
-    return Promise.reject(error);
-
-  }
-
 );
 
 export default api;

@@ -1,6 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+
 
 export default function TabLayout() {
   const { colors, theme } = useTheme();
@@ -18,6 +20,7 @@ export default function TabLayout() {
           backgroundColor: colors.cardBackground,
           borderTopColor: colors.border,
         },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600', paddingBottom: 2 },
       }}
     >
       {/* 🏠 Home */}
@@ -73,13 +76,32 @@ export default function TabLayout() {
         }}
       />
 
-      {/*  Resources */}
+      {/* 🤖 AI Assistant - Hidden from tab bar, accessible via sidebar */}
+      <Tabs.Screen
+        name="ai-assistant"
+        options={{
+          href: null,
+          title: 'AI Advisor',
+        }}
+      />
+
+      {/*  Resources - Hidden from tab bar, accessible via sidebar */}
       <Tabs.Screen
         name="resources"
         options={{
+          href: null,
           title: 'Resources',
-          tabBarIcon: () => <Text style={{ fontSize: 24 }}>📘</Text>,
         }}
+      />
+        {/* 🤖 AI Buddy */}
+        <Tabs.Screen
+         name="ai-chats"
+         options={{
+           title: 'AI Buddy',
+          tabBarIcon: ({ color, size }) => (
+         <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />
+          ),
+         }}
       />
     </Tabs>
   );
