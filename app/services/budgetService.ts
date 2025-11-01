@@ -24,6 +24,11 @@ export const addBudget = async (data: {
   return response.data;
 };
 
+export const deleteBudget = async (budgetId: string): Promise<void> => {
+  const response = await api.delete(`/budgets/${budgetId}`);
+  return response.data;
+};
+
 export const updateBudgetSpent = async (
   id: string,
   spentAmount: number

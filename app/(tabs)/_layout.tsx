@@ -73,12 +73,21 @@ export default function TabLayout() {
         }}
       />
 
-      {/*  Resources */}
+      {/* 🤖 AI Assistant - Hidden from tab bar, accessible via sidebar */}
+      <Tabs.Screen
+        name="ai-assistant"
+        options={{
+          href: null,
+          title: 'AI Advisor',
+        }}
+      />
+
+      {/*  Resources - Hidden from tab bar, accessible via sidebar */}
       <Tabs.Screen
         name="resources"
         options={{
+          href: null,
           title: 'Resources',
-          tabBarIcon: () => <Text style={{ fontSize: 24 }}>📘</Text>,
         }}
       />
     </Tabs>

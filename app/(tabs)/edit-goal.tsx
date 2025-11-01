@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
+  deleteGoal,
   getGoals, 
   updateGoalSaved,
   type Goal 
@@ -25,6 +26,7 @@ export default function EditGoalScreen() {
   const [savedAmount, setSavedAmount] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadGoal();
@@ -70,6 +72,33 @@ export default function EditGoalScreen() {
       setSaving(false);
     }
   };
+  
+  const handleDelete = async () => {
+  Alert.alert(
+    'Delete Goal',
+    'Are you sure you want to delete this goal?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteGoal(goalId);
+            Alert.alert('Deleted', 'Goal deleted successfully!');
+            router.back();
+          } catch (error) {
+            console.error('Error deleting goal:', error);
+            Alert.alert('Error', 'Failed to delete goal');
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]
+  );
+};
 
   const handleAddAmount = (amount: number) => {
     const currentAmount = parseFloat(savedAmount || '0');
@@ -191,6 +220,19 @@ export default function EditGoalScreen() {
           <Text style={styles.submitButtonText}>Update Goal</Text>
         )}
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.deleteButton, deleting && styles.submitButtonDisabled]}
+        onPress={handleDelete}
+        disabled={saving || deleting}
+      >
+        {deleting ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.submitButtonText}>Delete Goal</Text>
+        )}
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -341,6 +383,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2196F3',
   },
+  
+  deleteButton: {
+  backgroundColor: '#F44336',
+  marginHorizontal: 20,
+  marginBottom: 40,
+  padding: 18,
+  borderRadius: 10,
+  alignItems: 'center',
+  shadowColor: '#F44336',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 5,
+},
   submitButton: {
     backgroundColor: '#66BB6A',
     marginHorizontal: 20,

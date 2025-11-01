@@ -56,4 +56,22 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const budget = await Budget.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId
+    });
+    
+    if (!budget) {
+      return res.status(404).json({ error: 'Budget not found' });
+    }
+    
+    res.json({ message: 'Budget deleted successfully', budget });
+  } catch (error) {
+    console.error('Delete budget error:', error);
+    res.status(500).json({ error: 'Server error deleting budget' });
+  }
+});
+
 module.exports = router;
