@@ -5,7 +5,7 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,22 +21,11 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { PieChart } from 'react-native-chart-kit';
-
+import Sidebar from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-
-import {
-  getUserProfile,
-  updateMonthlyAllowance,
-} from '../services/authService';
-
-import type { Reminder } from '../services/reminderStore';
-import {
-  addReminder,
-  getReminders,
-  getRemindersForDate,
-} from '../services/reminderStore';
-
+import { getUserProfile, updateMonthlyAllowance } from '../services/authService';
+import { notifyBudgetThreshold, notifyDateTransactions, requestNotificationPermissions } from '../services/notificationService';
 import {
   getTransactions,
   getTransactionStats,
@@ -67,27 +56,21 @@ export default function HomeScreen() {
   >([]);
   const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
 
-  // --- reminders state ---
-  const [dayReminders, setDayReminders] = useState<Reminder[]>([]);
-  const [allRemindersByDate, setAllRemindersByDate] = useState<{
-    [date: string]: number;
-  }>({});
-  const [isAddReminderVisible, setIsAddReminderVisible] = useState(false);
-  const [newReminderTime, setNewReminderTime] = useState('09:00'); // HH:MM
-  const [newReminderMessage, setNewReminderMessage] = useState('');
-
-  // --- allowance / budget ---
   const [monthlyAllowance, setMonthlyAllowance] = useState(1000);
   const [isAllowanceModalVisible, setIsAllowanceModalVisible] = useState(false);
   const [tempAllowance, setTempAllowance] = useState('1000');
 
-  // derived values
-  const remaining = monthlyAllowance - totalExpense;
-  const spentPercentage =
-    monthlyAllowance > 0 ? (totalExpense / monthlyAllowance) * 100 : 0;
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [selectedDateTransactions, setSelectedDateTransactions] = useState<Transaction[]>([]);
+  const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+  
+useEffect(() => {
+  requestNotificationPermissions();
+}, []);
 
-  // --- overspend alert throttling ---
-  const [lastAlertPercentage, setLastAlertPercentage] = useState(0);
+  // Use useRef instead of useState to persist across renders without causing re-renders
+  const lastAlertPercentage = useRef(0);
 
   // refresh data whenever screen focuses
   useFocusEffect(
@@ -112,7 +95,7 @@ export default function HomeScreen() {
 
       };
       refreshDashboard();
-      setLastAlertPercentage(0);
+      // Don't reset lastAlertPercentage here - let it persist
     }, [])
     );
 
@@ -131,7 +114,6 @@ export default function HomeScreen() {
         'Unable to load allowance from server. Please check your backend connection.',
         [{ text: 'OK' }],
       );
-      // fallback
       setMonthlyAllowance(1000);
       setTempAllowance('1000');
     }
@@ -149,6 +131,10 @@ export default function HomeScreen() {
       await updateMonthlyAllowance(amount);
       setMonthlyAllowance(amount);
       setIsAllowanceModalVisible(false);
+      
+      // Reset alert tracking when allowance changes
+      lastAlertPercentage.current = 0;
+      
       Alert.alert('✅ Success', 'Monthly allowance updated!');
     } catch (error) {
       console.error('Error saving allowance:', error);
@@ -163,18 +149,32 @@ export default function HomeScreen() {
   // --- load dashboard data: transactions + stats ---
   const loadData = async () => {
     try {
-      const [transData, statsData] = await Promise.all([
+      console.log('🔄 Loading transactions and stats...');
+      const [transData, statsData, profile] = await Promise.all([
         getTransactions(),
         getTransactionStats(),
+        getUserProfile(), // Add this to refresh allowance
       ]);
+
+      console.log('✅ Transactions loaded:', transData.length);
+      console.log('💰 Total Income:', statsData.totalIncome);
+      console.log('💸 Total Expense:', statsData.totalExpense);
+      console.log('💵 Current Allowance:', profile.monthlyAllowance);
+
+      // Update allowance from profile
+      setMonthlyAllowance(profile.monthlyAllowance);
+      setTempAllowance(profile.monthlyAllowance.toString());
 
       setAllTransactions(transData);
       setTransactions(transData.slice(0, 5));
       setTotalIncome(statsData.totalIncome);
       setTotalExpense(statsData.totalExpense);
 
-      // alert logic after fresh totals
-      checkSpendingAlerts(statsData.totalExpense);
+      const remaining = profile.monthlyAllowance - statsData.totalExpense;
+      const percentage = profile.monthlyAllowance > 0 ? (statsData.totalExpense / profile.monthlyAllowance) * 100 : 0;
+      console.log('🎓 Allowance:', profile.monthlyAllowance, '| Remaining:', remaining, '| Used:', percentage.toFixed(1) + '%');
+
+      checkSpendingAlerts(statsData.totalExpense, profile.monthlyAllowance);
     } catch (error: any) {
       console.error('Error loading data:', error);
       if (error.response?.status === 401) {
@@ -188,110 +188,51 @@ export default function HomeScreen() {
     }
   };
 
-  // --- build reminder map for calendar dots ---
-  const loadAllRemindersForCalendar = async () => {
-    try {
-      const all = await getReminders(); // Reminder[]
-      const map: { [date: string]: number } = {};
+  const checkSpendingAlerts = async (expense: number, allowance: number) => {
+    const percentage = allowance > 0 ? (expense / allowance) * 100 : 0;
 
-      all.forEach(r => {
-        if (!map[r.date]) {
-          map[r.date] = 1;
-        } else {
-          map[r.date] += 1;
-        }
-      });
-
-      setAllRemindersByDate(map);
-    } catch (err) {
-      console.error('Failed to load reminders for calendar', err);
-    }
-  };
-
-  // --- budget alert thresholds ---
-  const checkSpendingAlerts = (expense: number) => {
-    const percentage =
-      monthlyAllowance > 0 ? (expense / monthlyAllowance) * 100 : 0;
-
-    if (percentage >= 100 && lastAlertPercentage < 100 && expense > 0) {
-      setLastAlertPercentage(100);
+    // Only show alerts when crossing thresholds AND haven't shown this level before
+    if (percentage >= 100 && lastAlertPercentage.current < 100 && expense > 0) {
+      lastAlertPercentage.current = 100;
+      await notifyBudgetThreshold(percentage, expense, allowance);
       Alert.alert(
         '🚨 Budget Exceeded!',
-        `You've spent $${expense.toFixed(
-          2,
-        )} out of your $${monthlyAllowance.toFixed(
-          2,
-        )} monthly allowance.\n\nYou're over budget by $${(
-          expense - monthlyAllowance
-        ).toFixed(2)}!`,
-        [{ text: 'Got it', style: 'default' }],
+        `You've spent $${expense.toFixed(2)} out of your $${allowance.toFixed(2)} monthly allowance.\n\nYou're over budget by $${(expense - allowance).toFixed(2)}!`,
+        [{ text: 'Got it', style: 'default' }]
       );
-    } else if (
-      percentage >= 90 &&
-      lastAlertPercentage < 90 &&
-      percentage < 100
-    ) {
-      setLastAlertPercentage(90);
+    } else if (percentage >= 90 && lastAlertPercentage.current < 90 && percentage < 100) {
+      lastAlertPercentage.current = 90;
+      await notifyBudgetThreshold(percentage, expense, allowance);
       Alert.alert(
         '⚠️ Nearly at Limit!',
-        `You've spent ${percentage.toFixed(
-          0,
-        )}% of your monthly allowance.\n\nOnly $${(
-          monthlyAllowance - expense
-        ).toFixed(2)} remaining!`,
-        [{ text: 'Okay', style: 'default' }],
+        `You've spent ${percentage.toFixed(0)}% of your monthly allowance.\n\nOnly $${(allowance - expense).toFixed(2)} remaining!`,
+        [{ text: 'Okay', style: 'default' }]
       );
-    } else if (
-      percentage >= 75 &&
-      lastAlertPercentage < 75 &&
-      percentage < 90
-    ) {
-      setLastAlertPercentage(75);
+    } else if (percentage >= 75 && lastAlertPercentage.current < 75 && percentage < 90) {
+      lastAlertPercentage.current = 75;
+      await notifyBudgetThreshold(percentage, expense, allowance);
       Alert.alert(
         '💡 Spending Alert',
-        `You've used ${percentage.toFixed(
-          0,
-        )}% of your monthly allowance.\n\n$${(
-          monthlyAllowance - expense
-        ).toFixed(2)} left to spend.`,
-        [{ text: 'Thanks', style: 'default' }],
+        `You've used ${percentage.toFixed(0)}% of your monthly allowance.\n\n$${(allowance - expense).toFixed(2)} left to spend.`,
+        [{ text: 'Thanks', style: 'default' }]
       );
     }
   };
 
-  // --- handle calendar day tap ---
-  const handleDateSelect = async (day: { dateString: string }) => {
-    setSelectedDate(day.dateString);
+const handleDateSelect = async (day: { dateString: string }) => {
 
-    // filter transactions for that date
-    const filtered = allTransactions.filter(transaction => {
-      const transDate = new Date(transaction.date)
-        .toISOString()
-        .split('T')[0];
-      return transDate === day.dateString;
-    });
-    setSelectedDateTransactions(filtered);
+  setSelectedDate(day.dateString);
+  const filtered = allTransactions.filter(transaction => {
 
-    // load reminders for that date
-    const reminders = await getRemindersForDate(day.dateString);
-    setDayReminders(reminders);
+    const transDate = new Date(transaction.date).toISOString().split('T')[0];
 
-    // open the "day details" modal
-    setIsDateDetailVisible(true);
+    return transDate === day.dateString;
+  });
+  setSelectedDateTransactions(filtered);
 
-    // optional polish: prefill reminder time if today
-    const todayISO = new Date().toISOString().split('T')[0];
-    if (day.dateString === todayISO) {
-      const now = new Date();
-      now.setHours(now.getHours() + 1);
-      now.setMinutes(0);
-      const hh = now.getHours().toString().padStart(2, '0');
-      const mm = now.getMinutes().toString().padStart(2, '0');
-      setNewReminderTime(`${hh}:${mm}`);
-    } else {
-      setNewReminderTime('09:00');
-    }
-  };
+  setIsDateDetailVisible(true);
+  await notifyDateTransactions(day.dateString, filtered);
+};
 
   // --- save a new reminder + schedule local notification ---
   const handleSaveReminder = async () => {
@@ -365,25 +306,8 @@ export default function HomeScreen() {
 
   // --- build markedDates object for <Calendar /> using multi-dot ---
   const getMarkedDates = () => {
-    // shape:
-    // {
-    //   '2025-10-28': {
-    //     dots: [{ color: colors.primary }, { color: '#FF9800' }],
-    //     selected: true,
-    //     selectedColor: colors.primary,
-    //   },
-    // }
-
-    const marked: Record<
-      string,
-      {
-        dots: { color: string }[];
-        selected?: boolean;
-        selectedColor?: string;
-      }
-    > = {};
-
-    // 1) Add a spending dot (colors.primary) for any day with transactions
+    const marked: any = {};
+    
     allTransactions.forEach(transaction => {
       const date = new Date(transaction.date).toISOString().split('T')[0];
       if (!marked[date]) marked[date] = { dots: [] };
@@ -400,7 +324,6 @@ export default function HomeScreen() {
       }
     });
 
-    // 3) Highlight the selected day
     if (selectedDate) {
       if (!marked[selectedDate]) marked[selectedDate] = { dots: [] };
       marked[selectedDate].selected = true;
@@ -423,10 +346,10 @@ export default function HomeScreen() {
   };
 
   const getProgressBarColor = () => {
-    if (spentPercentage >= 100) return '#F44336'; // red
-    if (spentPercentage >= 90) return '#FF9800'; // orange
-    if (spentPercentage >= 75) return '#FFC107'; // yellow
-    return '#66BB6A'; // green
+    if (spentPercentage >= 100) return '#F44336';
+    if (spentPercentage >= 90) return '#FF9800';
+    if (spentPercentage >= 75) return '#FFC107';
+    return '#66BB6A';
   };
 
   const getAllowanceStatus = () => {
@@ -523,17 +446,13 @@ export default function HomeScreen() {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
-    return chartData.length > 0
-      ? chartData
-      : [
-          {
-            name: 'No Data',
-            amount: 1,
-            color: '#E0E0E0',
-            legendFontColor: colors.textSecondary,
-            legendFontSize: 13,
-          },
-        ];
+    return chartData.length > 0 ? chartData : [{
+      name: 'No Data',
+      amount: 1,
+      color: '#E0E0E0',
+      legendFontColor: colors.textSecondary,
+      legendFontSize: 13,
+    }];
   };
 
   const chartData = calculateExpenseBreakdown();
@@ -552,12 +471,15 @@ export default function HomeScreen() {
       paddingBottom: 20,
       backgroundColor: colors.cardBackground,
     },
-    title: { fontSize: 28, fontWeight: 'bold', color: colors.text },
-    welcomeText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginTop: 4,
+    hamburgerButton: {
+      padding: 8,
+      marginRight: 12,
     },
+    headerCenter: {
+      flex: 1,
+    },
+    title: { fontSize: 24, fontWeight: 'bold', color: colors.text },
+    welcomeText: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
     headerButtons: { flexDirection: 'row', alignItems: 'center' },
 
     summaryContainer: {
@@ -941,39 +863,32 @@ export default function HomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Header */}
       <View style={styles.headerSection}>
-        <View>
+        <TouchableOpacity 
+          style={styles.hamburgerButton}
+          onPress={() => setIsSidebarVisible(true)}
+        >
+          <Ionicons name="menu" size={24} color={colors.text} />
+        </TouchableOpacity>
+
+        <View style={styles.headerCenter}>
           <Text style={styles.title}>💰 Budget Buddy</Text>
           <Text style={styles.welcomeText}>Welcome back, {user?.username}!</Text>
         </View>
 
         <View style={styles.headerButtons}>
           <TouchableOpacity onPress={() => router.push('/notifications')}>
-            <Ionicons
-              name="notifications-outline"
-              size={26}
-              color={colors.text}
-            />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push('/settings')}
-            style={{ marginLeft: 16 }}
-          >
-            <Ionicons name="settings-outline" size={26} color={colors.text} />
+          <TouchableOpacity onPress={() => router.push('/settings')} style={{ marginLeft: 16 }}>
+            <Ionicons name="settings-outline" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout}>
-            <Ionicons
-              name="log-out-outline"
-              size={26}
-              color={colors.danger}
-              style={{ marginLeft: 16 }}
-            />
+            <Ionicons name="log-out-outline" size={24} color={colors.danger} style={{ marginLeft: 16 }} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Summary */}
       <View style={styles.summaryContainer}>
         <View style={[styles.summaryBox, styles.incomeBox]}>
           <Text style={styles.summaryLabel}>Income</Text>
@@ -999,8 +914,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Monthly Allowance */}
-      <TouchableOpacity
+      <TouchableOpacity 
         style={styles.allowanceCard}
         onPress={() => {
           setTempAllowance(monthlyAllowance.toString());
@@ -1070,7 +984,6 @@ export default function HomeScreen() {
         </Text>
       </TouchableOpacity>
 
-      {/* Expense Breakdown */}
       <View style={styles.chartCard}>
         <Text style={styles.sectionTitle}>Expense Breakdown</Text>
         <PieChart
@@ -1091,7 +1004,6 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Calendar */}
       <View style={styles.calendarSection}>
         <Text style={styles.sectionTitle}>📅 Calendar</Text>
         <Text style={styles.calendarSubtitle}>
@@ -1167,7 +1079,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Recent Transactions */}
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
         <TouchableOpacity
@@ -1250,7 +1161,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Allowance Edit Modal */}
       <Modal
         visible={isAllowanceModalVisible}
         transparent={true}
@@ -1289,7 +1199,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Date Details Modal */}
       <Modal
         visible={isDateDetailVisible}
         transparent={true}
@@ -1330,7 +1239,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* mini summary */}
             {selectedDateTransactions.length > 0 && (
               <View style={styles.daySummaryContainer}>
                 <View
@@ -1368,7 +1276,6 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* transactions list */}
             <ScrollView style={styles.dateTransactionsList}>
               {selectedDateTransactions.length === 0 ? (
                 <View style={styles.emptyDateState}>
@@ -1442,66 +1349,6 @@ export default function HomeScreen() {
               )}
             </ScrollView>
 
-            {/* reminders list */}
-            <View style={{ marginTop: 16, marginBottom: 12 }}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { fontSize: 18, color: colors.text },
-                ]}
-              >
-                Reminders
-              </Text>
-
-              {dayReminders.length === 0 ? (
-                <Text
-                  style={[
-                    styles.modalSubtitle,
-                    { marginTop: 8, color: colors.textSecondary },
-                  ]}
-                >
-                  No reminders for this day.
-                </Text>
-              ) : (
-                dayReminders.map(r => (
-                  <View
-                    key={r.id}
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      paddingVertical: 8,
-                      borderBottomWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: colors.text,
-                        fontSize: 15,
-                        fontWeight: '500',
-                      }}
-                    >
-                      {r.time} – {r.message}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* add reminder button */}
-            <TouchableOpacity
-              style={styles.quickAddButton}
-              onPress={() => {
-                setIsAddReminderVisible(true);
-              }}
-            >
-              <Ionicons name="alarm-outline" size={24} color="#fff" />
-              <Text style={styles.quickAddText}>
-                Add Reminder for This Date
-              </Text>
-            </TouchableOpacity>
-
-            {/* add transaction button */}
             <TouchableOpacity
               style={styles.quickAddButton}
               onPress={() => {
@@ -1522,75 +1369,11 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Add Reminder Modal */}
-      <Modal
-        visible={isAddReminderVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsAddReminderVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: '85%' }]}>
-            <Text style={styles.modalTitle}>New Reminder</Text>
-
-            <Text style={styles.modalSubtitle}>
-              {selectedDate &&
-                new Date(selectedDate).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-            </Text>
-
-            {/* Time input */}
-            <Text style={styles.fieldLabel}>Time (HH:MM)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="09:00"
-              placeholderTextColor={colors.textSecondary}
-              value={newReminderTime}
-              onChangeText={setNewReminderTime}
-            />
-
-            {/* Message input */}
-            <Text style={styles.fieldLabel}>Reminder message</Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  fontSize: 18,
-                  textAlign: 'left',
-                  fontWeight: '400',
-                  minHeight: 70,
-                },
-              ]}
-              placeholder="Pay rent / Check budget / etc."
-              placeholderTextColor={colors.textSecondary}
-              value={newReminderMessage}
-              onChangeText={setNewReminderMessage}
-              multiline
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setIsAddReminderVisible(false);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveReminder}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Sidebar Component */}
+      <Sidebar
+        visible={isSidebarVisible}
+        onClose={() => setIsSidebarVisible(false)}
+      />
     </ScrollView>
   );
 }

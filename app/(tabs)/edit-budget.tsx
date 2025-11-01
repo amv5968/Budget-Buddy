@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
+  deleteBudget,
   getBudgets, 
   updateBudgetSpent,
   type Budget 
@@ -25,6 +26,8 @@ export default function EditBudgetScreen() {
   const [spentAmount, setSpentAmount] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
 
   useEffect(() => {
     loadBudget();
@@ -70,6 +73,33 @@ export default function EditBudgetScreen() {
       setSaving(false);
     }
   };
+  
+  const handleDelete = async () => {
+  Alert.alert(
+    'Delete Budget',
+    'Are you sure you want to delete this budget?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteBudget(budgetId);
+            Alert.alert('Deleted', 'Budget deleted successfully!');
+            router.back();
+          } catch (error) {
+            console.error('Error deleting budget:', error);
+            Alert.alert('Error', 'Failed to delete budget');
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]
+  );
+};
 
   const getProgressPercentage = () => {
     if (!budget) return 0;
@@ -171,6 +201,18 @@ export default function EditBudgetScreen() {
           <ActivityIndicator color="white" />
         ) : (
           <Text style={styles.submitButtonText}>Update Budget</Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.deleteButton, deleting && styles.submitButtonDisabled]}
+        onPress={handleDelete}
+        disabled={saving || deleting}
+      >
+        {deleting ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.submitButtonText}>Delete Budget</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -310,6 +352,19 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  deleteButton: {
+  backgroundColor: '#F44336',
+  marginHorizontal: 20,
+  marginBottom: 40,
+  padding: 18,
+  borderRadius: 10,
+  alignItems: 'center',
+  shadowColor: '#F44336',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 5,
+},
   submitButtonDisabled: {
     opacity: 0.7,
   },

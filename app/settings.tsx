@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Alert,
   ScrollView,
@@ -11,20 +11,34 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
+import { scheduleWeeklySummary, scheduleDailyTransactionReminder } from './services/notificationService';
+
+const SETTINGS_KEY = 'bb.settings.v1';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, themeMode, setThemeMode, colors } = useTheme();
 
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(true);
   const [budgetAlerts, setBudgetAlerts] = useState(true);
   const [goalUpdates, setGoalUpdates] = useState(true);
   const [lowBalanceAlert, setLowBalanceAlert] = useState(true);
   const [largeTransactionAlert, setLargeTransactionAlert] = useState(true);
+  const [transactionAlerts, setTransactionAlerts] = useState(true);
+  const [dailySummaryAlert, setDailySummaryAlert] = useState(true);
+  
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState('50');
   const [largeTransactionThreshold, setLargeTransactionThreshold] = useState('100');
+  
+  // Time settings
+  const [dailySummaryHour, setDailySummaryHour] = useState('20');
+  const [dailySummaryMinute, setDailySummaryMinute] = useState('0');
+  const [weeklySummaryHour, setWeeklySummaryHour] = useState('9');
+  const [weeklySummaryMinute, setWeeklySummaryMinute] = useState('0');
+  
   const [currency, setCurrency] = useState('USD');
   
   const [notifications, setNotifications] = useState([
@@ -48,8 +62,98 @@ export default function SettingsScreen() {
     },
   ]);
 
-  const handleSave = () => {
-    Alert.alert('✅ Settings Saved', 'Your preferences have been updated.');
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+      if (raw) {
+        const settings = JSON.parse(raw);
+        setNotificationsEnabled(settings.notificationsEnabled ?? true);
+        setWeeklySummary(settings.weeklySummary ?? true);
+        setBudgetAlerts(settings.budgetAlerts ?? true);
+        setGoalUpdates(settings.goalUpdates ?? true);
+        setLowBalanceAlert(settings.lowBalance ?? true);
+        setLargeTransactionAlert(settings.largeTx ?? true);
+        setTransactionAlerts(settings.transactionAlerts ?? true);
+        setDailySummaryAlert(settings.dailySummaryAlert ?? true);
+        setLowBalanceThreshold(settings.lowBalanceThreshold?.toString() ?? '50');
+        setLargeTransactionThreshold(settings.largeTxThreshold?.toString() ?? '100');
+        setDailySummaryHour(settings.dailySummaryHour?.toString() ?? '20');
+        setDailySummaryMinute(settings.dailySummaryMinute?.toString() ?? '0');
+        setWeeklySummaryHour(settings.weeklySummaryHour?.toString() ?? '9');
+        setWeeklySummaryMinute(settings.weeklySummaryMinute?.toString() ?? '0');
+        setCurrency(settings.currency ?? 'USD');
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const validateTimeInput = (value: string, max: number): string => {
+    const num = parseInt(value) || 0;
+    return Math.min(Math.max(0, num), max).toString();
+  };
+
+const handleSave = async () => {
+  try {
+    const settings = {
+      notificationsEnabled,
+      weeklySummary,
+      budgetAlerts,
+      goalUpdates,
+      lowBalance: lowBalanceAlert,
+      largeTx: largeTransactionAlert,
+      transactionAlerts,
+      dailySummaryAlert,
+      lowBalanceThreshold: parseFloat(lowBalanceThreshold) || 50,
+      largeTxThreshold: parseFloat(largeTransactionThreshold) || 100,
+      dailySummaryHour: parseInt(dailySummaryHour) || 20,
+      dailySummaryMinute: parseInt(dailySummaryMinute) || 0,
+      weeklySummaryHour: parseInt(weeklySummaryHour) || 9,
+      weeklySummaryMinute: parseInt(weeklySummaryMinute) || 0,
+      currency,
+    };
+
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+
+    // Update notification schedules with custom times
+    if (notificationsEnabled && weeklySummary) {
+      await scheduleWeeklySummary(
+        true, 
+        settings.weeklySummaryHour, 
+        settings.weeklySummaryMinute
+      );
+    } else {
+      await scheduleWeeklySummary(false);
+    }
+
+    if (notificationsEnabled && dailySummaryAlert) {
+      await scheduleDailyTransactionReminder(
+        true,
+        settings.dailySummaryHour,
+        settings.dailySummaryMinute
+      );
+    } else {
+      await scheduleDailyTransactionReminder(false);
+    }
+
+    Alert.alert('✅ Settings Saved', 'Your preferences have been updated and notifications have been rescheduled.');
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    Alert.alert('Error', 'Failed to save settings');
+  }
+};
+
+  const formatTime = (hour: string, minute: string): string => {
+    const h = parseInt(hour) || 0;
+    const m = parseInt(minute) || 0;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${displayHour}:${m.toString().padStart(2, '0')} ${period}`;
   };
 
   const dynamicStyles = StyleSheet.create({
@@ -101,6 +205,7 @@ export default function SettingsScreen() {
     subLabel: {
       fontSize: 14,
       marginTop: 10,
+      marginBottom: 5,
       color: colors.textSecondary,
     },
     input: {
@@ -111,6 +216,36 @@ export default function SettingsScreen() {
       marginTop: 5,
       color: colors.text,
       backgroundColor: colors.background,
+    },
+    timeInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 5,
+      marginBottom: 15,
+    },
+    timeInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      padding: 10,
+      color: colors.text,
+      backgroundColor: colors.background,
+      width: 60,
+      textAlign: 'center',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    timeSeparator: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginHorizontal: 8,
+    },
+    timePreview: {
+      marginLeft: 12,
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: '600',
     },
     saveButton: {
       backgroundColor: colors.primary,
@@ -149,7 +284,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={dynamicStyles.container}>
-      {/* 🔙 Header with Back Button */}
+      {/* Header with Back Button */}
       <View style={dynamicStyles.headerRow}>
         <TouchableOpacity onPress={() => router.back()} style={dynamicStyles.backButton}>
           <Ionicons name="arrow-back" size={26} color={colors.text} />
@@ -209,6 +344,54 @@ export default function SettingsScreen() {
         </View>
 
         <View style={dynamicStyles.row}>
+          <Text style={dynamicStyles.label}>Transaction Alerts</Text>
+          <Switch 
+            value={transactionAlerts} 
+            onValueChange={setTransactionAlerts} 
+            trackColor={{ true: colors.primary }}
+            disabled={!notificationsEnabled}
+          />
+        </View>
+
+        <View style={dynamicStyles.row}>
+          <Text style={dynamicStyles.label}>Daily Summary</Text>
+          <Switch 
+            value={dailySummaryAlert} 
+            onValueChange={setDailySummaryAlert} 
+            trackColor={{ true: colors.primary }}
+            disabled={!notificationsEnabled}
+          />
+        </View>
+
+        {dailySummaryAlert && notificationsEnabled && (
+          <>
+            <Text style={dynamicStyles.subLabel}>Daily Summary Time</Text>
+            <View style={dynamicStyles.timeInputContainer}>
+              <TextInput
+                style={dynamicStyles.timeInput}
+                value={dailySummaryHour}
+                keyboardType="numeric"
+                onChangeText={(text) => setDailySummaryHour(validateTimeInput(text, 23))}
+                placeholder="HH"
+                maxLength={2}
+              />
+              <Text style={dynamicStyles.timeSeparator}>:</Text>
+              <TextInput
+                style={dynamicStyles.timeInput}
+                value={dailySummaryMinute}
+                keyboardType="numeric"
+                onChangeText={(text) => setDailySummaryMinute(validateTimeInput(text, 59))}
+                placeholder="MM"
+                maxLength={2}
+              />
+              <Text style={dynamicStyles.timePreview}>
+                {formatTime(dailySummaryHour, dailySummaryMinute)}
+              </Text>
+            </View>
+          </>
+        )}
+
+        <View style={dynamicStyles.row}>
           <Text style={dynamicStyles.label}>Weekly Summary</Text>
           <Switch 
             value={weeklySummary} 
@@ -217,6 +400,34 @@ export default function SettingsScreen() {
             disabled={!notificationsEnabled}
           />
         </View>
+
+        {weeklySummary && notificationsEnabled && (
+          <>
+            <Text style={dynamicStyles.subLabel}>Weekly Summary Time (Mondays)</Text>
+            <View style={dynamicStyles.timeInputContainer}>
+              <TextInput
+                style={dynamicStyles.timeInput}
+                value={weeklySummaryHour}
+                keyboardType="numeric"
+                onChangeText={(text) => setWeeklySummaryHour(validateTimeInput(text, 23))}
+                placeholder="HH"
+                maxLength={2}
+              />
+              <Text style={dynamicStyles.timeSeparator}>:</Text>
+              <TextInput
+                style={dynamicStyles.timeInput}
+                value={weeklySummaryMinute}
+                keyboardType="numeric"
+                onChangeText={(text) => setWeeklySummaryMinute(validateTimeInput(text, 59))}
+                placeholder="MM"
+                maxLength={2}
+              />
+              <Text style={dynamicStyles.timePreview}>
+                {formatTime(weeklySummaryHour, weeklySummaryMinute)}
+              </Text>
+            </View>
+          </>
+        )}
 
         <View style={dynamicStyles.row}>
           <Text style={dynamicStyles.label}>Budget Alerts</Text>
@@ -264,7 +475,7 @@ export default function SettingsScreen() {
           value={lowBalanceThreshold}
           keyboardType="numeric"
           onChangeText={setLowBalanceThreshold}
-          placeholderTextColor={colors.textTertiary}
+          placeholderTextColor={colors.textSecondary}
         />
 
         <Text style={dynamicStyles.subLabel}>Large Transaction Threshold ($)</Text>
@@ -273,7 +484,7 @@ export default function SettingsScreen() {
           value={largeTransactionThreshold}
           keyboardType="numeric"
           onChangeText={setLargeTransactionThreshold}
-          placeholderTextColor={colors.textTertiary}
+          placeholderTextColor={colors.textSecondary}
         />
 
         <Text style={[dynamicStyles.sectionHeader, { marginTop: 20 }]}>Recent Notifications</Text>
@@ -318,7 +529,7 @@ export default function SettingsScreen() {
           style={dynamicStyles.input}
           value={currency}
           onChangeText={setCurrency}
-          placeholderTextColor={colors.textTertiary}
+          placeholderTextColor={colors.textSecondary}
         />
       </View>
 

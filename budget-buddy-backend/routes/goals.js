@@ -56,4 +56,22 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const goal = await Goal.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId
+    });
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    res.json({ message: 'Goal deleted successfully', goal });
+  } catch (error) {
+    console.error('Delete goal error:', error);
+    res.status(500).json({ error: 'Server error deleting goal' });
+  }
+});
+
 module.exports = router;

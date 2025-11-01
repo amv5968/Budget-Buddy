@@ -1,5 +1,4 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { addGoal } from '../services/goalService';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { addGoal, deleteGoal } from '../services/goalService';
+
+interface Goal {
+  id?: string;
+  name: string;
+  targetAmount: number;
+  icon: string;
+}
 
 const GOAL_ICONS = [
   '\u{1F3AF}', // target
@@ -30,10 +37,29 @@ const GOAL_ICONS = [
 
 export default function AddGoalScreen() {
   const router = useRouter();
+  const { goal } = useLocalSearchParams<{ goal?: string }>();
+
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [selectedIcon, setSelectedIcon] = useState(GOAL_ICONS[0]);
   const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [goalId, setGoalId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (goal) {
+      try {
+        const parsedGoal: Goal = JSON.parse(goal);
+        setName(parsedGoal.name);
+        setTargetAmount(parsedGoal.targetAmount.toString());
+        setSelectedIcon(parsedGoal.icon || GOAL_ICONS[0]);
+        setGoalId(parsedGoal.id);
+        setIsEditing(true);
+      } catch (err) {
+        console.error('Invalid goal data:', err);
+      }
+    }
+  }, [goal]);
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -56,14 +82,39 @@ export default function AddGoalScreen() {
 
       Alert.alert('Success', 'Goal created successfully!');
       router.back();
-        } catch (err: any) {
-      console.error('Error creating goal:', err);
-      const errorMessage = err?.response?.data?.error || 'Failed to create goal';
+    } catch (error: any) {
+      console.error('Error creating goal:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to create goal';
       Alert.alert('Error', errorMessage);
     } finally {
 
       setLoading(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!goalId) return;
+
+    Alert.alert('Delete Goal', 'Are you sure you want to delete this goal?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setLoading(true);
+            await deleteGoal(goalId);
+            Alert.alert('Deleted', 'Goal deleted successfully.');
+            router.back();
+          } catch (error) {
+            console.error('Error deleting goal:', error);
+            Alert.alert('Error', 'Failed to delete goal.');
+          } finally {
+            setLoading(false);
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -72,7 +123,7 @@ export default function AddGoalScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>{'\u{2190}'} Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Create Savings Goal</Text>
+        <Text style={styles.title}>{isEditing ? 'Edit Savings Goal' : 'Create Savings Goal'}</Text>
       </View>
 
       <View style={styles.section}>
@@ -124,9 +175,25 @@ export default function AddGoalScreen() {
         {loading ? (
           <ActivityIndicator color="white" />
         ) : (
-          <Text style={styles.submitButtonText}>Create Goal</Text>
+          <Text style={styles.submitButtonText}>
+            {isEditing ? 'Save Changes' : 'Create Goal'}
+          </Text>
         )}
       </TouchableOpacity>
+
+      {isEditing && (
+        <TouchableOpacity
+          style={[styles.deleteButton, loading && styles.submitButtonDisabled]}
+          onPress={handleDelete}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.deleteButtonText}>Delete Goal</Text>
+          )}
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -207,7 +274,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: '#66BB6A',
     marginHorizontal: 20,
-    marginBottom: 40,
+    marginBottom: 20,
     padding: 18,
     borderRadius: 10,
     alignItems: 'center',
@@ -217,10 +284,28 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  deleteButton: {
+    backgroundColor: '#E57373',
+    marginHorizontal: 20,
+    marginBottom: 40,
+    padding: 18,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#E57373',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   submitButtonDisabled: {
     opacity: 0.7,
   },
   submitButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  deleteButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',

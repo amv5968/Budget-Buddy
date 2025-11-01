@@ -1,34 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// app/services/api.ts
 import axios from 'axios';
 
+// IMPORTANT:
+// - Android emulator uses 10.0.2.2 to talk to your PC
+// - Your server.js is listening on PORT 3000
+// - Your routes are mounted under /api
 const api = axios.create({
-  baseURL: 'http://10.0.2.2:3000/api', // Android emulator -> your backend
+  baseURL: 'http://10.0.2.2:3000/api',
   timeout: 10000,
-});
-
-// Attach Authorization header automatically if we have a token
-api.interceptors.request.use(
-  async (config) => {
-    const token = await AsyncStorage.getItem('authToken');
-
-    if (token) {
-      // If headers exists and has a set() method (AxiosHeaders in Axios 1.x)
-      if (config.headers && typeof (config.headers as any).set === 'function') {
-        (config.headers as any).set('Authorization', `Bearer ${token}`);
-      } else {
-        // Fallback for plain object style headers
-        (config.headers as any) = {
-          ...(config.headers || {}),
-          Authorization: `Bearer ${token}`,
-        };
-      }
-    }
-
-    return config;
+  headers: {
+    'Content-Type': 'application/json',
   },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+});
 
 export default api;
