@@ -1,78 +1,95 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, } from 'react-native';
 import {
   deleteTransaction,
   getTransactions,
   updateTransaction,
-  type Transaction
 } from '../services/transactionService';
 
-const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
+type Transaction = {
+  _id: string;
+  type: 'Income' | 'Expense';
+  category: string;
+  amount: number;
+  description?: string;
+  date?: string;
+  createdAt?: string;
+};
+
+const INCOME_CATEGORIES = ['Salary', 'Business', 'Gift', 'Other Income'];
 const EXPENSE_CATEGORIES = [
-  'Groceries',
-  'Transport',
   'Food',
-  'Entertainment',
-  'Shopping',
-  'Healthcare',
-  'Education',
-  'Utilities',
   'Rent',
+  'Transport',
+  'Entertainment',
+  'Bills',
   'Other',
 ];
 
+const colors = {
+  background: '#f5f5f5',
+  cardBackground: '#ffffff',
+  text: '#333333',
+  textSecondary: '#666666',
+  border: '#e0e0e0',
+  primary: '#2196F3',
+  income: '#4CAF50',
+  expense: '#F44336',
+  danger: '#F44336',
+};
+
 export default function TransactionsScreen() {
-  const { colors } = useTheme();
   const router = useRouter();
-  const [filter, setFilter] = useState('All');
+
+  // UI state
+  const [filter, setFilter] = useState<
+    'All' | 'Income' | 'Expense' | 'Food' | 'Rent'
+  >('All');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  // edit mode state
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [type, setType] = useState<'Income' | 'Expense'>('Expense');
-  const [category, setCategory] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<string>('');
+  const [amount, setAmount] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    loadTransactions();
-  }, []);
-
+  // fetch transactions from backend
   const loadTransactions = async () => {
     try {
-      const data = await getTransactions();
-      setTransactions(data);
-    } catch (error) {
-      console.error('Error loading transactions:', error);
-      Alert.alert('Error', 'Failed to load transactions');
+      setLoading(true);
+      const data = await getTransactions(); // calls backend: GET /transactions
+      setTransactions(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (e: any) {
+      console.error('Failed to load transactions', e?.message || e);
+      setError('Could not load transactions.');
     } finally {
       setLoading(false);
     }
   };
 
-  const filterButtons = ['All', 'Income', 'Expense', 'Food', 'Rent'];
+  useEffect(() => {
+    loadTransactions();
+  }, []);
 
+  // filter buttons row
+  const filterButtons = ['All', 'Income', 'Expense', 'Food', 'Rent'] as const;
+
+  // apply filter
   const filteredTransactions = transactions.filter((t) => {
     if (filter === 'All') return true;
     if (filter === 'Income' || filter === 'Expense') return t.type === filter;
     return t.category === filter;
   });
 
+  // totals
   const totalIncome = transactions
     .filter((t) => t.type === 'Income')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -83,6 +100,7 @@ export default function TransactionsScreen() {
       .reduce((sum, t) => sum + t.amount, 0)
   );
 
+  // when user taps a row -> go into edit mode
   const startEdit = (t: Transaction) => {
     setEditing(t);
     setType(t.type);
@@ -91,15 +109,18 @@ export default function TransactionsScreen() {
     setDescription(t.description || '');
   };
 
+  // save changes (PUT /transactions/:id)
   const handleUpdate = async () => {
     if (!category) {
       Alert.alert('Error', 'Please select a category');
       return;
     }
+
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
+
     setSaving(true);
     try {
       await updateTransaction(editing!._id, {
@@ -109,17 +130,19 @@ export default function TransactionsScreen() {
         description: description.trim(),
         date: new Date().toISOString(),
       });
+
       Alert.alert('Success', 'Transaction updated successfully!');
       setEditing(null);
-      loadTransactions();
-    } catch (error) {
-      console.error('Error updating transaction:', error);
+      await loadTransactions();
+    } catch (err) {
+      console.error('Error updating transaction:', err);
       Alert.alert('Error', 'Failed to update transaction');
     } finally {
       setSaving(false);
     }
   };
 
+  // delete transaction (DELETE /transactions/:id)
   const handleDelete = async () => {
     Alert.alert(
       'Delete Transaction',
@@ -135,9 +158,9 @@ export default function TransactionsScreen() {
               await deleteTransaction(editing!._id);
               Alert.alert('Deleted', 'Transaction deleted successfully!');
               setEditing(null);
-              loadTransactions();
-            } catch (error) {
-              console.error('Error deleting transaction:', error);
+              await loadTransactions();
+            } catch (err) {
+              console.error('Error deleting transaction:', err);
               Alert.alert('Error', 'Failed to delete transaction');
             } finally {
               setDeleting(false);
@@ -148,9 +171,11 @@ export default function TransactionsScreen() {
     );
   };
 
+  // styles
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     center: { justifyContent: 'center', alignItems: 'center' },
+
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -160,17 +185,26 @@ export default function TransactionsScreen() {
       paddingBottom: 20,
       backgroundColor: colors.cardBackground,
     },
-    addButton: {
-      padding: 8,
-    },
-    backButton: { marginBottom: 16 },
-    backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
-    title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: colors.text },
     headerText: {
       fontSize: 28,
       fontWeight: 'bold',
       color: colors.text,
     },
+    addButton: { padding: 8 },
+
+    backButton: { marginBottom: 16 },
+    backText: {
+      fontSize: 16,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: 'bold',
+      marginBottom: 20,
+      color: colors.text,
+    },
+
     filterContainer: {
       backgroundColor: colors.cardBackground,
       paddingHorizontal: 20,
@@ -186,8 +220,10 @@ export default function TransactionsScreen() {
     },
     filterButtonActive: { backgroundColor: colors.primary },
     filterText: { color: colors.textSecondary, fontWeight: '600' },
-    filterTextActive: { color: 'white' },
+    filterTextActive: { color: '#fff' },
+
     listContainer: { padding: 20 },
+
     transactionCard: {
       backgroundColor: colors.cardBackground,
       padding: 15,
@@ -210,12 +246,22 @@ export default function TransactionsScreen() {
       marginRight: 15,
     },
     icon: { fontSize: 24 },
+
     transactionInfo: { flex: 1 },
-    transactionName: { fontSize: 16, fontWeight: '600', marginBottom: 4, color: colors.text },
-    transactionCategory: { fontSize: 13, color: colors.textSecondary },
+    transactionName: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 4,
+      color: colors.text,
+    },
+    transactionCategory: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
     transactionRight: { alignItems: 'flex-end' },
     transactionAmount: { fontSize: 18, fontWeight: 'bold', marginBottom: 2 },
     transactionDate: { fontSize: 12, color: colors.textSecondary },
+
     summaryFooter: {
       backgroundColor: colors.cardBackground,
       flexDirection: 'row',
@@ -225,9 +271,19 @@ export default function TransactionsScreen() {
       borderTopColor: colors.border,
     },
     summaryItem: { flex: 1, alignItems: 'center' },
-    summaryValue: { fontSize: 24, fontWeight: 'bold', color: colors.income },
+    summaryValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.income,
+    },
     summaryLabel: { fontSize: 14, color: colors.textSecondary },
-    summaryDivider: { width: 1, backgroundColor: colors.border, marginHorizontal: 20 },
+    summaryDivider: {
+      width: 1,
+      backgroundColor: colors.border,
+      marginHorizontal: 20,
+    },
+
+    // edit mode styles
     typeContainer: { flexDirection: 'row', padding: 20, gap: 12 },
     typeButton: {
       flex: 1,
@@ -238,11 +294,24 @@ export default function TransactionsScreen() {
       borderWidth: 2,
       borderColor: colors.border,
     },
-    typeButtonActive: { backgroundColor: '#66BB6A', borderColor: '#66BB6A' },
-    typeText: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
-    typeTextActive: { color: 'white' },
+    typeButtonActive: {
+      backgroundColor: '#66BB6A',
+      borderColor: '#66BB6A',
+    },
+    typeText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    typeTextActive: { color: '#fff' },
+
     section: { paddingHorizontal: 20, marginBottom: 24 },
-    label: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 12 },
+    label: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 12,
+    },
     amountInput: {
       backgroundColor: colors.cardBackground,
       borderRadius: 10,
@@ -252,6 +321,7 @@ export default function TransactionsScreen() {
       textAlign: 'center',
       color: colors.text,
     },
+
     categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     categoryButton: {
       paddingVertical: 10,
@@ -265,8 +335,16 @@ export default function TransactionsScreen() {
       backgroundColor: colors.primary + '20',
       borderColor: colors.primary,
     },
-    categoryText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
-    categoryTextActive: { color: colors.primary, fontWeight: '600' },
+    categoryText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    categoryTextActive: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+
     descriptionInput: {
       backgroundColor: colors.cardBackground,
       borderRadius: 10,
@@ -276,6 +354,7 @@ export default function TransactionsScreen() {
       textAlignVertical: 'top',
       minHeight: 100,
     },
+
     submitButton: {
       backgroundColor: '#66BB6A',
       marginHorizontal: 20,
@@ -292,55 +371,86 @@ export default function TransactionsScreen() {
       borderRadius: 10,
       alignItems: 'center',
     },
-    submitText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+    submitText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
     disabledButton: { opacity: 0.7 },
   });
 
+  // loading state screen
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        {error ? (
+          <Text style={{ color: colors.textSecondary, marginTop: 12 }}>
+            {error}
+          </Text>
+        ) : null}
       </View>
     );
   }
 
-  // 🔹 If in edit mode
+  // EDIT MODE SCREEN
   if (editing) {
-    const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const categories =
+      type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
     return (
       <ScrollView style={styles.container}>
+        {/* header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setEditing(null)} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => setEditing(null)}
+            style={styles.backButton}
+          >
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Edit Transaction</Text>
         </View>
 
+        {/* choose Income / Expense */}
         <View style={styles.typeContainer}>
           <TouchableOpacity
-            style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
+            style={[
+              styles.typeButton,
+              type === 'Income' && styles.typeButtonActive,
+            ]}
             onPress={() => {
               setType('Income');
               setCategory('');
             }}
           >
-            <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
+            <Text
+              style={[
+                styles.typeText,
+                type === 'Income' && styles.typeTextActive,
+              ]}
+            >
               Income
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
+            style={[
+              styles.typeButton,
+              type === 'Expense' && styles.typeButtonActive,
+            ]}
             onPress={() => {
               setType('Expense');
               setCategory('');
             }}
           >
-            <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
+            <Text
+              style={[
+                styles.typeText,
+                type === 'Expense' && styles.typeTextActive,
+              ]}
+            >
               Expense
             </Text>
           </TouchableOpacity>
         </View>
 
+        {/* amount */}
         <View style={styles.section}>
           <Text style={styles.label}>Amount</Text>
           <TextInput
@@ -352,6 +462,7 @@ export default function TransactionsScreen() {
           />
         </View>
 
+        {/* category */}
         <View style={styles.section}>
           <Text style={styles.label}>Category</Text>
           <View style={styles.categoryGrid}>
@@ -377,6 +488,7 @@ export default function TransactionsScreen() {
           </View>
         </View>
 
+        {/* description */}
         <View style={styles.section}>
           <Text style={styles.label}>Description</Text>
           <TextInput
@@ -388,25 +500,27 @@ export default function TransactionsScreen() {
           />
         </View>
 
+        {/* save */}
         <TouchableOpacity
           style={[styles.submitButton, saving && styles.disabledButton]}
           onPress={handleUpdate}
           disabled={saving || deleting}
         >
           {saving ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.submitText}>Update Transaction</Text>
           )}
         </TouchableOpacity>
 
+        {/* delete */}
         <TouchableOpacity
           style={[styles.deleteButton, deleting && styles.disabledButton]}
           onPress={handleDelete}
           disabled={saving || deleting}
         >
           {deleting ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.submitText}>Delete Transaction</Text>
           )}
@@ -415,11 +529,13 @@ export default function TransactionsScreen() {
     );
   }
 
-  // 🔹 Otherwise show list mode
+  // LIST MODE SCREEN
   return (
     <View style={styles.container}>
+      {/* header row */}
       <View style={styles.header}>
         <Text style={styles.headerText}>Transactions</Text>
+
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push('/(tabs)/add-transaction')}
@@ -428,6 +544,7 @@ export default function TransactionsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -454,9 +571,12 @@ export default function TransactionsScreen() {
         ))}
       </ScrollView>
 
+      {/* list */}
       <FlatList
         data={filteredTransactions}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) =>
+            item._id ? String(item._id) : String(index)
+        }
         contentContainerStyle={styles.listContainer}
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -464,37 +584,63 @@ export default function TransactionsScreen() {
             onPress={() => startEdit(item)}
           >
             <View style={styles.iconContainer}>
-              <Text style={styles.icon}>💵</Text>
+              <Text style={styles.icon}>
+                {item.type === 'Income' ? '💰' : '💸'}
+              </Text>
             </View>
+
             <View style={styles.transactionInfo}>
-              <Text style={styles.transactionName}>{item.category}</Text>
-              <Text style={styles.transactionCategory}>{item.description}</Text>
+              <Text style={styles.transactionName}>
+                {item.description || item.category}
+              </Text>
+              <Text style={styles.transactionCategory}>{item.category}</Text>
             </View>
+
             <View style={styles.transactionRight}>
               <Text
                 style={[
                   styles.transactionAmount,
-                  { color: item.type === 'Income' ? colors.income : colors.expense },
+                  {
+                    color:
+                      item.type === 'Income'
+                        ? colors.income
+                        : colors.expense,
+                  },
                 ]}
               >
-                {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
+                {item.type === 'Income' ? '+' : '-'}$
+                {Math.abs(item.amount).toFixed(2)}
               </Text>
+
+              {/* date fallback logic */}
               <Text style={styles.transactionDate}>
-                {new Date(item.date).toLocaleDateString()}
+                {item.date
+                  ? new Date(item.date).toLocaleDateString()
+                  : item.createdAt
+                  ? new Date(item.createdAt).toLocaleDateString()
+                  : ''}
               </Text>
             </View>
           </TouchableOpacity>
         )}
       />
 
+      {/* footer summary */}
       <View style={styles.summaryFooter}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>${totalIncome.toFixed(0)}</Text>
           <Text style={styles.summaryLabel}>Income</Text>
         </View>
+
         <View style={styles.summaryDivider} />
+
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: colors.expense }]}>
+          <Text
+            style={[
+              styles.summaryValue,
+              { color: colors.expense },
+            ]}
+          >
             ${totalExpense.toFixed(0)}
           </Text>
           <Text style={styles.summaryLabel}>Expenses</Text>

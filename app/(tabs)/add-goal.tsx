@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { addGoal, deleteGoal } from '../services/goalService';
@@ -87,6 +87,7 @@ export default function AddGoalScreen() {
       const errorMessage = error.response?.data?.error || 'Failed to create goal';
       Alert.alert('Error', errorMessage);
     } finally {
+
       setLoading(false);
     }
   };

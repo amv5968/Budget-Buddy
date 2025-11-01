@@ -1,10 +1,21 @@
-// app/services/notificationService.ts
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { getTransactionStats, type Transaction } from '../services/transactionService';
 
-const SETTINGS_KEY = 'bb.settings.v1';
+// How notifications behave when they fire while the app is foregrounded
+Notifications.setNotificationHandler({
+  // We widen the return type to avoid TS complaining about platform-specific fields
+  handleNotification: async (): Promise<any> => {
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true, // iOS style
+      shouldShowList: true,   // iOS style
+    };
+  },
+});
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -296,6 +307,22 @@ export async function maybeTriggerThresholdAlerts(newTx?: Transaction) {
       trigger: null,
     });
   }
+
+  // Newer Expo SDKs want an explicit trigger object with type: DATE
+  const trigger: Notifications.NotificationTriggerInput = {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
+    date: dateObj,
+  };
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Budget Buddy 💸',
+      body: message,
+      sound: true,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+    },
+    trigger,
+  });
 }
 
 // Budget threshold alerts
