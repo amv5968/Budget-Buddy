@@ -1,8 +1,4 @@
-import {
-  requestNotificationPermission,
-  scheduleReminderNotification,
-} from '../services/notificationService';
-
+import { addReminder, getReminders, getRemindersForDate } from '../services/reminderService';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,7 +21,13 @@ import Sidebar from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getUserProfile, updateMonthlyAllowance } from '../services/authService';
-import { notifyBudgetThreshold, notifyDateTransactions, requestNotificationPermissions } from '../services/notificationService';
+import {
+  notifyBudgetThreshold,
+  notifyDateTransactions,
+  requestNotificationPermissions,
+  scheduleReminderNotification,
+} from '../services/notificationService';
+
 import {
   getTransactions,
   getTransactionStats,
@@ -51,26 +53,57 @@ export default function HomeScreen() {
 
   // --- calendar state ---
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedDateTransactions, setSelectedDateTransactions] = useState<
-    Transaction[]
-  >([]);
+  const [selectedDateTransactions, setSelectedDateTransactions] = useState<Transaction[]>([]);
   const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
 
+  // --- allowance state ---
   const [monthlyAllowance, setMonthlyAllowance] = useState(1000);
   const [isAllowanceModalVisible, setIsAllowanceModalVisible] = useState(false);
   const [tempAllowance, setTempAllowance] = useState('1000');
 
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
-  const [selectedDateTransactions, setSelectedDateTransactions] = useState<Transaction[]>([]);
-  const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
+  // --- sidebar ---
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
-  
-useEffect(() => {
-  requestNotificationPermissions();
-}, []);
 
-  // Use useRef instead of useState to persist across renders without causing re-renders
+  // --- reminders UI state ---
+  const [isAddReminderVisible, setIsAddReminderVisible] = useState(false);
+  const [newReminderTime, setNewReminderTime] = useState('09:00'); // 'HH:MM'
+  const [newReminderMessage, setNewReminderMessage] = useState('');
+  const [dayReminders, setDayReminders] = useState<{ time: string; message: string }[]>([]);
+  const [allRemindersByDate, setAllRemindersByDate] = useState<
+    Record<string, { time: string; message: string }[]>
+  >({});
+
+  // --- derived allowance stats (used in UI) ---
+  const remaining = monthlyAllowance - totalExpense;
+  const spentPercentage = monthlyAllowance > 0 ? (totalExpense / monthlyAllowance) * 100 : 0;
+
+  // Request OS notification permission on mount
+  useEffect(() => {
+    requestNotificationPermissions();
+  }, []);
+
+  // Track last alert threshold to avoid duplicate alerts
   const lastAlertPercentage = useRef(0);
+
+  // --- helper: load all reminders and index by date ---
+  const loadAllRemindersForCalendar = async () => {
+    try {
+      const list: { date: string; time: string; message: string }[] = await getReminders();
+
+      const byDate: Record<string, { time: string; message: string }[]> = {};
+      for (const r of list) {
+        if (!byDate[r.date]) byDate[r.date] = [];
+        byDate[r.date].push({ time: r.time, message: r.message });
+      }
+
+      setAllRemindersByDate(byDate);
+      if (selectedDate) {
+        setDayReminders(byDate[selectedDate] ?? []);
+      }
+    } catch (e) {
+      console.error('loadAllRemindersForCalendar failed', e);
+    }
+  };
 
   // refresh data whenever screen focuses
   useFocusEffect(
@@ -79,32 +112,38 @@ useEffect(() => {
         await loadAllowance();
         await loadData();
         await loadAllRemindersForCalendar();
-    // After loading reminders from backend
-      const allReminders = await getReminders();
 
-    // Re-schedule local notifications for all upcoming reminders
-        for (const r of allReminders) {
-      const [hh, mm] = r.time.split(':');
-      const [yyyy, mon, dd] = r.date.split('-');
-      const fireDate = new Date(Number(yyyy), Number(mon) - 1, Number(dd), Number(hh), Number(mm));
-
-      if (fireDate.getTime() > Date.now()) {
-      await scheduleReminderNotification(fireDate, r.message);
+        // Re-schedule local notifications for all upcoming reminders
+        try {
+          const all = await getReminders();
+          for (const r of all) {
+            const [hh, mm] = r.time.split(':');
+            const [yyyy, mon, dd] = r.date.split('-');
+            const fireDate = new Date(
+              Number(yyyy),
+              Number(mon) - 1,
+              Number(dd),
+              Number(hh),
+              Number(mm)
+            );
+            if (fireDate.getTime() > Date.now()) {
+              await scheduleReminderNotification(fireDate, r.message);
+            }
+          }
+        } catch (e) {
+          console.error('Reschedule notifications failed', e);
         }
-      }
-
       };
+
       refreshDashboard();
-      // Don't reset lastAlertPercentage here - let it persist
     }, [])
-    );
+  );
 
   // --- load allowance from backend ---
   const loadAllowance = async () => {
     try {
       const profile = await getUserProfile();
       const dbAllowance = profile.monthlyAllowance ?? 1000;
-
       setMonthlyAllowance(dbAllowance);
       setTempAllowance(dbAllowance.toString());
     } catch (error) {
@@ -112,7 +151,7 @@ useEffect(() => {
       Alert.alert(
         'Connection Error',
         'Unable to load allowance from server. Please check your backend connection.',
-        [{ text: 'OK' }],
+        [{ text: 'OK' }]
       );
       setMonthlyAllowance(1000);
       setTempAllowance('1000');
@@ -131,37 +170,28 @@ useEffect(() => {
       await updateMonthlyAllowance(amount);
       setMonthlyAllowance(amount);
       setIsAllowanceModalVisible(false);
-      
+
       // Reset alert tracking when allowance changes
       lastAlertPercentage.current = 0;
-      
+
       Alert.alert('✅ Success', 'Monthly allowance updated!');
     } catch (error) {
       console.error('Error saving allowance:', error);
-      Alert.alert(
-        'Save Failed',
-        'Unable to save to database. Please check your backend connection.',
-        [{ text: 'OK' }],
-      );
+      Alert.alert('Save Failed', 'Unable to save to database. Please check your backend connection.', [
+        { text: 'OK' },
+      ]);
     }
   };
 
   // --- load dashboard data: transactions + stats ---
   const loadData = async () => {
     try {
-      console.log('🔄 Loading transactions and stats...');
       const [transData, statsData, profile] = await Promise.all([
         getTransactions(),
         getTransactionStats(),
-        getUserProfile(), // Add this to refresh allowance
+        getUserProfile(), // refresh allowance from backend too
       ]);
 
-      console.log('✅ Transactions loaded:', transData.length);
-      console.log('💰 Total Income:', statsData.totalIncome);
-      console.log('💸 Total Expense:', statsData.totalExpense);
-      console.log('💵 Current Allowance:', profile.monthlyAllowance);
-
-      // Update allowance from profile
       setMonthlyAllowance(profile.monthlyAllowance);
       setTempAllowance(profile.monthlyAllowance.toString());
 
@@ -169,10 +199,6 @@ useEffect(() => {
       setTransactions(transData.slice(0, 5));
       setTotalIncome(statsData.totalIncome);
       setTotalExpense(statsData.totalExpense);
-
-      const remaining = profile.monthlyAllowance - statsData.totalExpense;
-      const percentage = profile.monthlyAllowance > 0 ? (statsData.totalExpense / profile.monthlyAllowance) * 100 : 0;
-      console.log('🎓 Allowance:', profile.monthlyAllowance, '| Remaining:', remaining, '| Used:', percentage.toFixed(1) + '%');
 
       checkSpendingAlerts(statsData.totalExpense, profile.monthlyAllowance);
     } catch (error: any) {
@@ -191,7 +217,6 @@ useEffect(() => {
   const checkSpendingAlerts = async (expense: number, allowance: number) => {
     const percentage = allowance > 0 ? (expense / allowance) * 100 : 0;
 
-    // Only show alerts when crossing thresholds AND haven't shown this level before
     if (percentage >= 100 && lastAlertPercentage.current < 100 && expense > 0) {
       lastAlertPercentage.current = 100;
       await notifyBudgetThreshold(percentage, expense, allowance);
@@ -219,20 +244,23 @@ useEffect(() => {
     }
   };
 
-const handleDateSelect = async (day: { dateString: string }) => {
+  const handleDateSelect = async (day: { dateString: string }) => {
+    setSelectedDate(day.dateString);
 
-  setSelectedDate(day.dateString);
-  const filtered = allTransactions.filter(transaction => {
+    const filtered = allTransactions.filter((transaction) => {
+      const transDate = new Date(transaction.date).toISOString().split('T')[0];
+      return transDate === day.dateString;
+    });
 
-    const transDate = new Date(transaction.date).toISOString().split('T')[0];
+    setSelectedDateTransactions(filtered);
+    setIsDateDetailVisible(true);
 
-    return transDate === day.dateString;
-  });
-  setSelectedDateTransactions(filtered);
+    // show a notification summary for the selected day
+    await notifyDateTransactions(day.dateString, filtered);
 
-  setIsDateDetailVisible(true);
-  await notifyDateTransactions(day.dateString, filtered);
-};
+    // show reminders for the selected day
+    setDayReminders(allRemindersByDate[day.dateString] ?? []);
+  };
 
   // --- save a new reminder + schedule local notification ---
   const handleSaveReminder = async () => {
@@ -246,55 +274,36 @@ const handleDateSelect = async (day: { dateString: string }) => {
     }
 
     try {
-      // Build a JS Date from (selectedDate + time)
-      // selectedDate = 'YYYY-MM-DD' (from Calendar)
-      // newReminderTime = 'HH:MM'
       const [hh, mm] = newReminderTime.split(':');
       const [yyyy, mon, dd] = selectedDate.split('-');
-      const fireDate = new Date(
-        Number(yyyy),
-        Number(mon) - 1,
-        Number(dd),
-        Number(hh),
-        Number(mm),
-        0,
-        0,
-      );
+      const fireDate = new Date(Number(yyyy), Number(mon) - 1, Number(dd), Number(hh), Number(mm), 0, 0);
 
-      // Guard against scheduling in the past
       if (fireDate.getTime() < Date.now()) {
         Alert.alert('Time already passed', 'Pick a future time.');
         return;
       }
 
-      // 1. Save reminder locally
-      const saved = await addReminder(
-        selectedDate,
-        newReminderTime,
-        newReminderMessage,
-      );
+      // 1) Save reminder (local/db depending on your service)
+      const saved = await addReminder(selectedDate, newReminderTime, newReminderMessage);
 
-      // 2. Refresh the reminder list for that day
+      // 2) Refresh the reminder list for that day
       const updatedList = await getRemindersForDate(selectedDate);
       setDayReminders(updatedList);
 
-      // 3. Request OS permission & schedule local notification
-      const granted = await requestNotificationPermission();
+      // 3) OS permission & local notification
+      const granted = await requestNotificationPermissions();
       if (!granted) {
-        Alert.alert(
-          'Notifications blocked',
-          'Reminder saved, but notifications are disabled in system settings.',
-        );
+        Alert.alert('Notifications blocked', 'Reminder saved, but notifications are disabled in system settings.');
       } else {
         await scheduleReminderNotification(fireDate, newReminderMessage);
       }
 
-      // 4. Reset modal state and close the Add Reminder modal
+      // 4) Reset modal state
       setNewReminderTime('09:00');
       setNewReminderMessage('');
       setIsAddReminderVisible(false);
 
-      // 5. Rebuild reminder dots on calendar
+      // 5) Re-index reminders for calendar dots
       await loadAllRemindersForCalendar();
 
       Alert.alert('✅ Reminder added', `Reminder set for ${saved.time}`);
@@ -307,19 +316,20 @@ const handleDateSelect = async (day: { dateString: string }) => {
   // --- build markedDates object for <Calendar /> using multi-dot ---
   const getMarkedDates = () => {
     const marked: any = {};
-    
-    allTransactions.forEach(transaction => {
+
+    // 1) spending dots (primary color)
+    allTransactions.forEach((transaction) => {
       const date = new Date(transaction.date).toISOString().split('T')[0];
       if (!marked[date]) marked[date] = { dots: [] };
-      if (!marked[date].dots.some(d => d.color === colors.primary)) {
+      if (!marked[date].dots.some((d: any) => d.color === colors.primary)) {
         marked[date].dots.push({ color: colors.primary });
       }
     });
 
-    // 2) Add a reminder dot (orange) for any day with reminders
-    Object.keys(allRemindersByDate).forEach(date => {
+    // 2) reminder dots (orange)
+    Object.keys(allRemindersByDate).forEach((date) => {
       if (!marked[date]) marked[date] = { dots: [] };
-      if (!marked[date].dots.some(d => d.color === '#FF9800')) {
+      if (!marked[date].dots.some((d: any) => d.color === '#FF9800')) {
         marked[date].dots.push({ color: '#FF9800' });
       }
     });
@@ -335,11 +345,11 @@ const handleDateSelect = async (day: { dateString: string }) => {
 
   const getDayStats = () => {
     const income = selectedDateTransactions
-      .filter(t => t.type === 'Income')
+      .filter((t) => t.type === 'Income')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const expense = selectedDateTransactions
-      .filter(t => t.type === 'Expense')
+      .filter((t) => t.type === 'Expense')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     return { income, expense };
@@ -353,12 +363,9 @@ const handleDateSelect = async (day: { dateString: string }) => {
   };
 
   const getAllowanceStatus = () => {
-    if (spentPercentage >= 100)
-      return { emoji: '🚨', text: 'Over Budget!', color: colors.danger };
-    if (spentPercentage >= 90)
-      return { emoji: '⚠️', text: 'Nearly at Limit', color: '#FF9800' };
-    if (spentPercentage >= 75)
-      return { emoji: '💡', text: 'Watch Spending', color: '#FFC107' };
+    if (spentPercentage >= 100) return { emoji: '🚨', text: 'Over Budget!', color: colors.danger };
+    if (spentPercentage >= 90) return { emoji: '⚠️', text: 'Nearly at Limit', color: '#FF9800' };
+    if (spentPercentage >= 75) return { emoji: '💡', text: 'Watch Spending', color: '#FFC107' };
     return { emoji: '✅', text: 'On Track', color: colors.income };
   };
 
@@ -412,12 +419,10 @@ const handleDateSelect = async (day: { dateString: string }) => {
   };
 
   const calculateExpenseBreakdown = () => {
-    const expenseTransactions = transactions.filter(
-      t => t.type === 'Expense',
-    );
+    const expenseTransactions = transactions.filter((t) => t.type === 'Expense');
     const categoryTotals: { [key: string]: number } = {};
 
-    expenseTransactions.forEach(transaction => {
+    expenseTransactions.forEach((transaction) => {
       if (categoryTotals[transaction.category]) {
         categoryTotals[transaction.category] += transaction.amount;
       } else {
@@ -425,15 +430,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
       }
     });
 
-    const pieColors = [
-      '#4CAF50',
-      '#2196F3',
-      '#FF9800',
-      '#E91E63',
-      '#9C27B0',
-      '#FFC107',
-      '#00BCD4',
-    ];
+    const pieColors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#FFC107', '#00BCD4'];
 
     const chartData = Object.entries(categoryTotals)
       .map(([name, amount], index) => ({
@@ -446,18 +443,22 @@ const handleDateSelect = async (day: { dateString: string }) => {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
-    return chartData.length > 0 ? chartData : [{
-      name: 'No Data',
-      amount: 1,
-      color: '#E0E0E0',
-      legendFontColor: colors.textSecondary,
-      legendFontSize: 13,
-    }];
+    return chartData.length > 0
+      ? chartData
+      : [
+          {
+            name: 'No Data',
+            amount: 1,
+            color: '#E0E0E0',
+            legendFontColor: colors.textSecondary,
+            legendFontSize: 13,
+          },
+        ];
   };
 
   const chartData = calculateExpenseBreakdown();
 
-  // --- styles depend on theme colors ---
+  // --- styles ---
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     centerContent: { justifyContent: 'center', alignItems: 'center' },
@@ -859,15 +860,10 @@ const handleDateSelect = async (day: { dateString: string }) => {
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.headerSection}>
-        <TouchableOpacity 
-          style={styles.hamburgerButton}
-          onPress={() => setIsSidebarVisible(true)}
-        >
+        <TouchableOpacity style={styles.hamburgerButton} onPress={() => setIsSidebarVisible(true)}>
           <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
 
@@ -904,8 +900,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
             style={[
               styles.balanceText,
               {
-                color:
-                  totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336',
+                color: totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336',
               },
             ]}
           >
@@ -914,7 +909,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
         </View>
       </View>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.allowanceCard}
         onPress={() => {
           setTempAllowance(monthlyAllowance.toString());
@@ -924,13 +919,8 @@ const handleDateSelect = async (day: { dateString: string }) => {
         <View style={styles.allowanceHeader}>
           <View>
             <Text style={styles.sectionTitle}>🎓 Monthly Allowance</Text>
-            <View style={styles.statusBadge}>
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  { color: getAllowanceStatus().color },
-                ]}
-              >
+            <View className="status-badge" style={styles.statusBadge}>
+              <Text style={[styles.statusBadgeText, { color: getAllowanceStatus().color }]}>
                 {getAllowanceStatus().emoji} {getAllowanceStatus().text}
               </Text>
             </View>
@@ -956,10 +946,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
             <Text
               style={[
                 styles.allowanceAmount,
-                {
-                  color: remaining >= 0 ? colors.income : colors.danger,
-                  fontWeight: 'bold',
-                },
+                { color: remaining >= 0 ? colors.income : colors.danger, fontWeight: 'bold' },
               ]}
             >
               ${remaining >= 0 ? remaining.toFixed(2) : '0.00'}
@@ -993,8 +980,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
           chartConfig={{
             backgroundGradientFrom: colors.cardBackground,
             backgroundGradientTo: colors.cardBackground,
-            color: (opacity = 1) =>
-              colors.text + Math.round(opacity * 255).toString(16),
+            color: (opacity = 1) => colors.text + Math.round(opacity * 255).toString(16),
             strokeWidth: 2,
           }}
           accessor="amount"
@@ -1006,9 +992,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
 
       <View style={styles.calendarSection}>
         <Text style={styles.sectionTitle}>📅 Calendar</Text>
-        <Text style={styles.calendarSubtitle}>
-          Tap a date to view transactions • Dots indicate activity
-        </Text>
+        <Text style={styles.calendarSubtitle}>Tap a date to view transactions • Dots indicate activity</Text>
 
         <Calendar
           onDayPress={handleDateSelect}
@@ -1028,90 +1012,39 @@ const handleDateSelect = async (day: { dateString: string }) => {
           }}
         />
 
-        {/* Legend under calendar */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            marginTop: 8,
-            gap: 16,
-          }}
-        >
+        {/* Legend */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, gap: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: colors.primary, // Spending
-                marginRight: 6,
-              }}
-            />
-            <Text
-              style={{
-                color: colors.textSecondary,
-                fontSize: 12,
-              }}
-            >
-              Spending
-            </Text>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginRight: 6 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Spending</Text>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: '#FF9800', // Reminder
-                marginRight: 6,
-              }}
-            />
-            <Text
-              style={{
-                color: colors.textSecondary,
-                fontSize: 12,
-              }}
-            >
-              Reminder
-            </Text>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF9800', marginRight: 6 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Reminder</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push('/(tabs)/add-transaction')}
-        >
+        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/add-transaction')}>
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
       {transactions.length === 0 ? (
         <View style={styles.emptyState}>
-          {/* Optional themed icon instead of emoji calendar */}
-          <Ionicons
-            name="calendar-outline"
-            size={48}
-            color={colors.textSecondary}
-            style={{ marginBottom: 12 }}
-          />
+          <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
           <Text style={styles.emptyText}>No transactions</Text>
-          <Text style={styles.emptySubtext}>
-            Add your first transaction to get started!
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyButton}
-            onPress={() => router.push('/(tabs)/add-transaction')}
-          >
+          <Text style={styles.emptySubtext}>Add your first transaction to get started!</Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/add-transaction')}>
             <Text style={styles.emptyButtonText}>Add Transaction</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.listContent}>
-          {transactions.map(item => (
+          {transactions.map((item) => (
             <TouchableOpacity
               key={item._id}
               style={styles.transactionItem}
@@ -1119,60 +1052,40 @@ const handleDateSelect = async (day: { dateString: string }) => {
             >
               <View style={styles.transactionLeft}>
                 <View style={styles.iconContainer}>
-                  <Text style={styles.transactionIcon}>
-                    {getIconForCategory(item.category)}
-                  </Text>
+                  <Text style={styles.transactionIcon}>{getIconForCategory(item.category)}</Text>
                 </View>
                 <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionCategory}>
-                    {item.category}
-                  </Text>
-                  <Text style={styles.transactionDate}>
-                    {formatDate(item.date)}
-                  </Text>
+                  <Text style={styles.transactionCategory}>{item.category}</Text>
+                  <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
                 </View>
               </View>
               <View style={styles.transactionRight}>
                 <Text
                   style={[
                     styles.transactionAmount,
-                    {
-                      color:
-                        item.type === 'Income'
-                          ? colors.income
-                          : colors.expense,
-                    },
+                    { color: item.type === 'Income' ? colors.income : colors.expense },
                   ]}
                 >
-                  {item.type === 'Income' ? '+' : '-'}$
-                  {Math.abs(item.amount).toFixed(2)}
+                  {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
                 </Text>
-                <Text
-                  style={[
-                    styles.transactionType,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {item.type}
-                </Text>
+                <Text style={[styles.transactionType, { color: colors.textSecondary }]}>{item.type}</Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
       )}
 
+      {/* Allowance modal */}
       <Modal
         visible={isAllowanceModalVisible}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setIsAllowanceModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit Monthly Allowance</Text>
-            <Text style={styles.modalSubtitle}>
-              Set your monthly budget limit
-            </Text>
+            <Text style={styles.modalSubtitle}>Set your monthly budget limit</Text>
             <TextInput
               style={styles.modalInput}
               placeholder="Enter amount"
@@ -1188,10 +1101,7 @@ const handleDateSelect = async (day: { dateString: string }) => {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={saveAllowance}
-              >
+              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={saveAllowance}>
                 <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -1199,9 +1109,10 @@ const handleDateSelect = async (day: { dateString: string }) => {
         </View>
       </Modal>
 
+      {/* Date details modal */}
       <Modal
         visible={isDateDetailVisible}
-        transparent={true}
+        transparent
         animationType="slide"
         onRequestClose={() => setIsDateDetailVisible(false)}
       >
@@ -1222,54 +1133,27 @@ const handleDateSelect = async (day: { dateString: string }) => {
 
                 <Text style={styles.modalSubtitle}>
                   {selectedDateTransactions.length} transaction
-                  {selectedDateTransactions.length !== 1 ? 's' : ''} ·{' '}
-                  {dayReminders.length} reminder
+                  {selectedDateTransactions.length !== 1 ? 's' : ''} · {dayReminders.length} reminder
                   {dayReminders.length !== 1 ? 's' : ''}
                 </Text>
               </View>
 
-              <TouchableOpacity
-                onPress={() => setIsDateDetailVisible(false)}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={32}
-                  color={colors.textSecondary}
-                />
+              <TouchableOpacity onPress={() => setIsDateDetailVisible(false)}>
+                <Ionicons name="close-circle" size={32} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             {selectedDateTransactions.length > 0 && (
               <View style={styles.daySummaryContainer}>
-                <View
-                  style={[
-                    styles.daySummaryBox,
-                    { backgroundColor: colors.income + '20' },
-                  ]}
-                >
+                <View style={[styles.daySummaryBox, { backgroundColor: colors.income + '20' }]}>
                   <Text style={styles.daySummaryLabel}>Income</Text>
-                  <Text
-                    style={[
-                      styles.daySummaryAmount,
-                      { color: colors.income },
-                    ]}
-                  >
+                  <Text style={[styles.daySummaryAmount, { color: colors.income }]}>
                     +${getDayStats().income.toFixed(2)}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.daySummaryBox,
-                    { backgroundColor: colors.expense + '20' },
-                  ]}
-                >
+                <View style={[styles.daySummaryBox, { backgroundColor: colors.expense + '20' }]}>
                   <Text style={styles.daySummaryLabel}>Expenses</Text>
-                  <Text
-                    style={[
-                      styles.daySummaryAmount,
-                      { color: colors.expense },
-                    ]}
-                  >
+                  <Text style={[styles.daySummaryAmount, { color: colors.expense }]}>
                     -${getDayStats().expense.toFixed(2)}
                   </Text>
                 </View>
@@ -1279,19 +1163,12 @@ const handleDateSelect = async (day: { dateString: string }) => {
             <ScrollView style={styles.dateTransactionsList}>
               {selectedDateTransactions.length === 0 ? (
                 <View style={styles.emptyDateState}>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={48}
-                    color={colors.textSecondary}
-                    style={{ marginBottom: 12 }}
-                  />
+                  <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
                   <Text style={styles.emptyText}>No transactions</Text>
-                  <Text style={styles.emptySubtext}>
-                    Add a transaction for this date
-                  </Text>
+                  <Text style={styles.emptySubtext}>Add a transaction for this date</Text>
                 </View>
               ) : (
-                selectedDateTransactions.map(item => (
+                selectedDateTransactions.map((item) => (
                   <TouchableOpacity
                     key={item._id}
                     style={styles.dateTransactionItem}
@@ -1301,48 +1178,24 @@ const handleDateSelect = async (day: { dateString: string }) => {
                     }}
                   >
                     <View style={styles.transactionLeft}>
-                      <View
-                        style={[
-                          styles.iconContainer,
-                          { backgroundColor: colors.cardBackground },
-                        ]}
-                      >
-                        <Text style={styles.transactionIcon}>
-                          {getIconForCategory(item.category)}
-                        </Text>
+                      <View style={[styles.iconContainer, { backgroundColor: colors.cardBackground }]}>
+                        <Text style={styles.transactionIcon}>{getIconForCategory(item.category)}</Text>
                       </View>
                       <View style={styles.transactionInfo}>
-                        <Text style={styles.transactionCategory}>
-                          {item.category}
-                        </Text>
-                        <Text style={styles.transactionDate}>
-                          {item.description || 'No description'}
-                        </Text>
+                        <Text style={styles.transactionCategory}>{item.category}</Text>
+                        <Text style={styles.transactionDate}>{item.description || 'No description'}</Text>
                       </View>
                     </View>
                     <View style={styles.transactionRight}>
                       <Text
                         style={[
                           styles.transactionAmount,
-                          {
-                            color:
-                              item.type === 'Income'
-                                ? colors.income
-                                : colors.expense,
-                          },
+                          { color: item.type === 'Income' ? colors.income : colors.expense },
                         ]}
                       >
-                        {item.type === 'Income' ? '+' : '-'}$
-                        {Math.abs(item.amount).toFixed(2)}
+                        {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
                       </Text>
-                      <Text
-                        style={[
-                          styles.transactionType,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {item.type}
-                      </Text>
+                      <Text style={[styles.transactionType, { color: colors.textSecondary }]}>{item.type}</Text>
                     </View>
                   </TouchableOpacity>
                 ))
@@ -1356,24 +1209,15 @@ const handleDateSelect = async (day: { dateString: string }) => {
                 router.push('/(tabs)/add-transaction');
               }}
             >
-              <Ionicons
-                name="add-circle-outline"
-                size={24}
-                color="#fff"
-              />
-              <Text style={styles.quickAddText}>
-                Add Transaction for This Date
-              </Text>
+              <Ionicons name="add-circle-outline" size={24} color="#fff" />
+              <Text style={styles.quickAddText}>Add Transaction for This Date</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Sidebar Component */}
-      <Sidebar
-        visible={isSidebarVisible}
-        onClose={() => setIsSidebarVisible(false)}
-      />
+      {/* Sidebar */}
+      <Sidebar visible={isSidebarVisible} onClose={() => setIsSidebarVisible(false)} />
     </ScrollView>
   );
 }
