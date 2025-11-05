@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
@@ -34,7 +33,7 @@ export default function TabLayout() {
 
       {/* Hidden routes */}
       <Tabs.Screen name="add-transaction" options={{ href: null }} />
-      <Tabs.Screen name="edit-transaction" options={{ href: null }} />
+      <Tabs.Screen name="profile" options={{ href: null }} /> 
 
       {/* 💰 Budgets */}
       <Tabs.Screen
@@ -57,6 +56,11 @@ export default function TabLayout() {
       />
       <Tabs.Screen name="add-goal" options={{ href: null }} />
       <Tabs.Screen name="edit-goal" options={{ href: null }} />
+      <Tabs.Screen name="profile-edit" options={{ href: null }} />
+      <Tabs.Screen name="privacy"      options={{ href: null }} />
+      <Tabs.Screen name="help"         options={{ href: null }} />
+      <Tabs.Screen name="about"        options={{ href: null }} />
+
 
       {/* 💸 Transactions */}
       <Tabs.Screen
@@ -92,16 +96,6 @@ export default function TabLayout() {
           href: null,
           title: 'Resources',
         }}
-      />
-        {/* 🤖 AI Buddy */}
-        <Tabs.Screen
-         name="ai-chats"
-         options={{
-           title: 'AI Buddy',
-          tabBarIcon: ({ color, size }) => (
-         <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />
-          ),
-         }}
       />
     </Tabs>
   );

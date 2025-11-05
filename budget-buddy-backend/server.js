@@ -4,7 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-
+const usersRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
@@ -24,7 +24,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/goals', goalRoutes);
-app.use('/api/reminders', remindersRouter); // <-- mount reminders API
+app.use('/api/reminders', remindersRouter); 
+app.use('/api/users', usersRoutes);
 
 // health check
 app.get('/api/health', (req, res) => {

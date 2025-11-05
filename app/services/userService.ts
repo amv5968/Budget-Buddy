@@ -1,73 +1,49 @@
-import db from './database';
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// app/services/userService.ts
+import { API_BASE } from '../config';
 
- export interface User {
-   id: number;
+/** Shape returned by the backend for a user */
+export type ApiUser = {
+  _id: string;
   username: string;
   email: string;
+};
+
+/** Helper to build auth header */
+function authHeader(token: string) {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
 }
 
- let webUserId = 1;
+/** GET /api/users/me — fetch current user */
+export async function fetchMe(token: string): Promise<ApiUser> {
+  const res = await fetch(`${API_BASE}/users/me`, {
+    method: 'GET',
+    headers: authHeader(token),
+  });
 
-export const createUser = async (username: string, email: string, password: string): Promise<boolean> => {
-   try {
-     if (Platform.OS === 'web') {
-       const existingUsers = await AsyncStorage.getItem('users');
-       const users = existingUsers ? JSON.parse(existingUsers) : [];
-      
-       if (users.find((u: any) => u.username === username || u.email === email)) {
-        return false;
-      }
-      
-      users.push({ id: webUserId++, username, email, password });
-      await AsyncStorage.setItem('users', JSON.stringify(users));
-      return true;
-    }
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`fetchMe failed (${res.status}): ${err}`);
+  }
+  return res.json();
+}
 
-     if (!db) {
-      throw new Error('Database not initialized');
-     }
+/** PUT /api/users/me — update profile (currently username only) */
+export async function updateMe(
+  token: string,
+  data: { username: string }
+): Promise<ApiUser> {
+  const res = await fetch(`${API_BASE}/users/me`, {
+    method: 'PUT',
+    headers: authHeader(token),
+    body: JSON.stringify(data),
+  });
 
-   const result = (db as any).runSync(
-      'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-     [username, email, password]
-    );
-    return result.changes > 0;
-  } catch (error) {
-    console.error('Error creating user:', error);
-    return false;
-   }
- };
-
- export const loginUser = async (emailOrUsername: string, password: string): Promise<User | null> => {
-   try {
-    if (Platform.OS === 'web') {
-      const existingUsers = await AsyncStorage.getItem('users');
-      const users = existingUsers ? JSON.parse(existingUsers) : [];
-      
-      const user = users.find(
-        (u: any) => (u.email === emailOrUsername || u.username === emailOrUsername) && u.password === password
-      );
-      
-      if (user) {
-        return { id: user.id, username: user.username, email: user.email };
-       }
-       return null;
-     }
-
-     if (!db) {
-       throw new Error('Database not initialized');
-     }
-
-     const result = (db as any).getFirstSync(
-           'SELECT id, username, email FROM users WHERE (email = ? OR username = ?) AND password = ?',
-       [emailOrUsername, emailOrUsername, password]
-    ) as User | null;
-    
-     return result || null;
-  } catch (error) {
-    console.error('Error logging in:', error);
-    return null;
-   }
- };
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`updateMe failed (${res.status}): ${err}`);
+  }
+  return res.json();
+}

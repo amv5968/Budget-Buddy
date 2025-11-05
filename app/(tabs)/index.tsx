@@ -1,4 +1,3 @@
-import { addReminder, getReminders, getRemindersForDate } from '../services/reminderService';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -27,6 +26,7 @@ import {
   requestNotificationPermissions,
   scheduleReminderNotification,
 } from '../services/notificationService';
+import { addReminder, getReminders, getRemindersForDate } from '../services/reminderService';
 
 import {
   getTransactions,
@@ -879,8 +879,8 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={() => router.push('/settings')} style={{ marginLeft: 16 }}>
             <Ionicons name="settings-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={24} color={colors.danger} style={{ marginLeft: 16 }} />
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={{ marginLeft: 16 }}>
+           <Ionicons name="person-circle-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
