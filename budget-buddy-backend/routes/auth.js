@@ -151,5 +151,30 @@ router.patch('/monthly-allowance', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error updating allowance' });
   }
 });
+// PUT /api/auth/update-profile
+router.put('/update-profile', async (req, res) => {
+  try {
+    const { username, email, monthlyAllowance } = req.body;
+
+    // In a real app, you’d find and update the user in MongoDB:
+    // const userId = req.user.id;  // if using JWT middleware
+    // const user = await User.findByIdAndUpdate(userId, { username, email, monthlyAllowance }, { new: true });
+
+    console.log('Updating user profile:', { username, email, monthlyAllowance });
+
+    // Mock success response for now
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        username,
+        email,
+        monthlyAllowance,
+      },
+    });
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

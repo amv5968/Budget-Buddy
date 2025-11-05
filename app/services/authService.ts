@@ -17,6 +17,7 @@ export interface UserProfile {
   monthlyAllowance: number;
 }
 
+// 🧩 SIGNUP
 export const signup = async (
   username: string,
   email: string,
@@ -30,6 +31,7 @@ export const signup = async (
   return response.data;
 };
 
+// 🔐 LOGIN
 export const login = async (
   emailOrUsername: string,
   password: string
@@ -41,11 +43,13 @@ export const login = async (
   return response.data;
 };
 
+// 👤 GET USER PROFILE
 export const getUserProfile = async (): Promise<UserProfile> => {
   const response = await api.get('/auth/profile');
   return response.data;
 };
 
+// 💰 UPDATE MONTHLY ALLOWANCE
 export const updateMonthlyAllowance = async (
   monthlyAllowance: number
 ): Promise<UserProfile> => {
@@ -53,4 +57,23 @@ export const updateMonthlyAllowance = async (
     monthlyAllowance,
   });
   return response.data;
+};
+
+// 🧾 UPDATE USER PROFILE (NEW)
+export const updateUserProfile = async (
+  profileData: {
+    username?: string;
+    email?: string;
+    monthlyAllowance?: number;
+  }
+): Promise<UserProfile> => {
+  try {
+    console.log('[updateUserProfile] sending data:', profileData);
+    const response = await api.put('/auth/update-profile', profileData);
+    console.log('[updateUserProfile] response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('[updateUserProfile] error:', error.response?.data || error.message);
+    throw error;
+  }
 };

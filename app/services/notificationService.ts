@@ -345,3 +345,36 @@ export async function clearAllNotifications() {
 export async function cancelAllScheduledNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
+
+// ✅ Schedule a one-time reminder notification (used by HomeScreen)
+export async function scheduleReminderNotification(fireDate: Date, message: string) {
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) return;
+
+    // ✅ Use Expo enum for type safety
+    const trigger: Notifications.CalendarTriggerInput = {
+      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+      year: fireDate.getFullYear(),
+      month: fireDate.getMonth() + 1, // months are 0-indexed
+      day: fireDate.getDate(),
+      hour: fireDate.getHours(),
+      minute: fireDate.getMinutes(),
+      second: fireDate.getSeconds(),
+      repeats: false,
+    };
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '⏰ Reminder',
+        body: message,
+        data: { type: 'reminder', fireDate: fireDate.toISOString() },
+      },
+      trigger,
+    });
+
+    console.log(`[scheduleReminderNotification] Reminder set for ${fireDate.toISOString()}`);
+  } catch (error: any) {
+    console.error('[scheduleReminderNotification] Error scheduling reminder:', error);
+  }
+}
