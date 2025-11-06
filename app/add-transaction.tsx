@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { db } from '../src/db/sqlite'; // path is correct from app/*
+import { getDb } from '../src/db/sqlite';
 import { formatCurrencyFromCents } from '../src/utils/currency';
 
 export default function AddTransaction() {
@@ -16,35 +16,31 @@ export default function AddTransaction() {
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [note, setNote] = useState('');
 
-  const save = () => {
+  const save = async () => {
     // safer validation
     const n = Number(amount);
     const cents = Math.round(n * 100);
     if (!Number.isFinite(n) || cents <= 0) {
-      AccessibilityInfo.announceForAccessibility('Enter a valid amount');
-      return;
-    }
+    AccessibilityInfo.announceForAccessibility('Enter a valid amount');
+    return;
+  }
 
-    db.transaction((tx: any) => {
-      tx.executeSql(
-        `INSERT INTO transactions (amount_cents, type, occurred_at, note)
-         VALUES (?, ?, ?, ?);`,
-        [cents, type, Date.now(), note || null],
-        // success
-        () => {
-          AccessibilityInfo.announceForAccessibility('Transaction saved');
-          setAmount('');
-          setNote('');
-        },
-        // error
-        (_tx: any, err: any) => {
-          console.warn('SQL error:', err);
-          // returning true marks the error as handled and aborts the tx cleanly
-          return true;
-        }
-      );
-    });
-  };
+  try {
+  const db = await getDb(); // open the async database
+
+  await db.runAsync(
+    `INSERT INTO transactions (amount_cents, type, occurred_at, note)
+     VALUES (?, ?, ?, ?);`,
+    [cents, type, Date.now(), note || null]
+  );
+
+  AccessibilityInfo.announceForAccessibility('Transaction saved');
+  setAmount('');
+  setNote('');
+  } catch (err) {
+  console.warn('SQL error:', err);
+  AccessibilityInfo.announceForAccessibility('Could not save transaction');
+  } };
 
   const previewCents = Math.round((Number(amount) || 0) * 100);
 

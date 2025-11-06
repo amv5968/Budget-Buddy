@@ -1,8 +1,18 @@
 // app/(tabs)/profile-edit.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { updateMe } from '../services/userService';
@@ -15,15 +25,26 @@ import { updateMe } from '../services/userService';
 export default function ProfileEditScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { user, token: ctxToken, setUser } = useAuth() as any; // setUser/token are commonly exposed by AuthContext
+  const { user, token: ctxToken, setUser } = useAuth() as any;
   const [username, setUsername] = useState<string>(user?.username ?? '');
   const [saving, setSaving] = useState(false);
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        container: { flex: 1, backgroundColor: colors.background },
-        body: { padding: 16 },
+        // Used by KeyboardAvoidingView
+        wrap: {
+          flex: 1,
+          backgroundColor: colors.background,
+          padding: 16,
+        },
+        header: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 12,
+        },
+        body: { paddingTop: 4 },
         label: { color: colors.textSecondary, marginBottom: 6, fontWeight: '600' },
         input: {
           backgroundColor: colors.cardBackground,
@@ -48,7 +69,6 @@ export default function ProfileEditScreen() {
     [colors, saving]
   );
 
-
   async function getToken(): Promise<string | null> {
     if (ctxToken) return ctxToken as string;
     try {
@@ -69,9 +89,7 @@ export default function ProfileEditScreen() {
     setSaving(true);
     try {
       const token = await getToken();
-      if (!token) {
-        throw new Error('Not authenticated (no token). Please log in again.');
-      }
+      if (!token) throw new Error('Not authenticated (no token). Please log in again.');
 
       const updated = await updateMe(token, { username: trimmed });
 
@@ -90,9 +108,21 @@ export default function ProfileEditScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.wrap}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/* 🔙 Back Button */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
+      >
+        <Ionicons name="arrow-back" size={24} color={colors.text} />
+        <Text style={{ color: colors.text, fontSize: 16, marginLeft: 6 }}>Back</Text>
+      </TouchableOpacity>
+
+      {/* Header */}
+      <Text style={styles.header}>Edit Profile</Text>
+
       <View style={styles.body}>
         <Text style={styles.label}>Display name</Text>
         <TextInput
@@ -105,11 +135,7 @@ export default function ProfileEditScreen() {
         />
 
         <Text style={styles.label}>Email</Text>
-        <TextInput
-          value={user?.email ?? ''}
-          editable={false}
-          style={[styles.input, { opacity: 0.7 }]}
-        />
+        <TextInput value={user?.email ?? ''} editable={false} style={[styles.input, { opacity: 0.7 }]} />
         <Text style={styles.hint}>Email is tied to your account and can’t be changed here.</Text>
 
         <TouchableOpacity disabled={saving} style={styles.button} onPress={onSave}>

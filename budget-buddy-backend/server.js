@@ -9,8 +9,8 @@ const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
 const goalRoutes = require('./routes/goals');
-const remindersRouter = require('./routes/reminders.routes'); // <-- CommonJS require
-
+// <-- CommonJS require
+const remindersRouter = require('./routes/reminders.routes'); 
 dotenv.config();
 
 const app = express();
