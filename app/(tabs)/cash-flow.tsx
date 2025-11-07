@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BarChart, LineChart } from 'react-native-chart-kit';
 import { useTheme } from '../../context/ThemeContext';
 import { getTransactions, getTransactionStats, type Transaction } from '../services/transactionService';
 
@@ -443,6 +444,105 @@ const CashFlowScreen: React.FC = () => {
             Green: ${totalIncome.toFixed(0)} | Red: ${totalExpenses.toFixed(0)}
           </Text>
         </View>
+
+        {/* Line Chart - Cash Flow Trend */}
+        <View style={dynamicStyles.chartContainer}>
+          <Text style={dynamicStyles.chartTitle}>📈 Cash Flow Trend</Text>
+          <LineChart
+            data={{
+              labels: timeFilter === 'week' 
+                ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                : timeFilter === 'month'
+                ? ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+                : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+              datasets: [
+                {
+                  data: (() => {
+                    const periods = timeFilter === 'week' ? 7 : timeFilter === 'month' ? 4 : 12;
+                    const periodData = Array(periods).fill(0);
+                    const now = new Date();
+                    
+                    transactions.forEach((t: Transaction) => {
+                      const transDate = new Date(t.date);
+                      const diffTime = now.getTime() - transDate.getTime();
+                      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                      
+                      let index = -1;
+                      if (timeFilter === 'week' && diffDays < 7) {
+                        index = 6 - diffDays;
+                      } else if (timeFilter === 'month' && diffDays < 30) {
+                        index = 3 - Math.floor(diffDays / 7);
+                      } else if (timeFilter === 'year' && diffDays < 365) {
+                        index = 11 - Math.floor(diffDays / 30);
+                      }
+                      
+                      if (index >= 0 && index < periods) {
+                        periodData[index] += t.type === 'Income' ? t.amount : -t.amount;
+                      }
+                    });
+                    
+                    return periodData.map(v => Math.abs(v) || 0.1);
+                  })(),
+                  color: (opacity = 1) => colors.primary,
+                  strokeWidth: 3,
+                },
+              ],
+            }}
+            width={screenWidth - 68}
+            height={220}
+            yAxisLabel="$"
+            yAxisSuffix=""
+            chartConfig={{
+              backgroundColor: colors.cardBackground,
+              backgroundGradientFrom: colors.cardBackground,
+              backgroundGradientTo: colors.cardBackground,
+              decimalPlaces: 0,
+              color: (opacity = 1) => colors.primary,
+              labelColor: (opacity = 1) => colors.textSecondary,
+              propsForDots: {
+                r: '5',
+                strokeWidth: '2',
+                stroke: colors.primary,
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 12,
+            }}
+          />
+        </View>
+
+        {/* Bar Chart - Category Comparison */}
+        {topExpenseCategories.length > 0 && (
+          <View style={dynamicStyles.chartContainer}>
+            <Text style={dynamicStyles.chartTitle}>📊 Category Spending</Text>
+            <BarChart
+              data={{
+                labels: topExpenseCategories.map(([cat]) => cat.substring(0, 8)),
+                datasets: [{
+                  data: topExpenseCategories.map(([, amount]) => amount),
+                }],
+              }}
+              width={screenWidth - 68}
+              height={220}
+              yAxisLabel="$"
+              yAxisSuffix=""
+              chartConfig={{
+                backgroundColor: colors.cardBackground,
+                backgroundGradientFrom: colors.cardBackground,
+                backgroundGradientTo: colors.cardBackground,
+                decimalPlaces: 0,
+                color: (opacity = 1) => colors.expense,
+                labelColor: (opacity = 1) => colors.textSecondary,
+              }}
+              style={{
+                marginVertical: 8,
+                borderRadius: 12,
+              }}
+            />
+          </View>
+        )}
 
         {/* Key Metrics */}
         <Text style={dynamicStyles.sectionTitle}>📊 Key Metrics</Text>

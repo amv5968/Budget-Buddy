@@ -77,3 +77,19 @@ export const updateUserProfile = async (
     throw error;
   }
 };
+
+export const changePassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<{ message: string }> => {
+  try {
+    const response = await api.post('/auth/change-password', {
+      currentPassword,
+      newPassword,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('[changePassword] error:', error.response?.data || error.message);
+    throw error;
+  }
+};

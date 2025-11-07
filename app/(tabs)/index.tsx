@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { PieChart } from 'react-native-chart-kit';
+import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import Sidebar from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -50,6 +50,7 @@ export default function HomeScreen() {
   // --- ui / fetch state ---
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedChartType, setSelectedChartType] = useState<'pie' | 'line' | 'bar'>('pie');
 
   // --- calendar state ---
   const [selectedDate, setSelectedDate] = useState('');
@@ -458,6 +459,61 @@ export default function HomeScreen() {
 
   const chartData = calculateExpenseBreakdown();
 
+  // Calculate 7-day spending trend
+  const calculateSpendingTrend = () => {
+    const last7Days = Array(7).fill(0);
+    const labels = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+    }
+    
+    allTransactions.forEach((t) => {
+      if (t.type === 'Expense') {
+        const transDate = new Date(t.date);
+        const diffTime = today.getTime() - transDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays >= 0 && diffDays < 7) {
+          last7Days[6 - diffDays] += Math.abs(t.amount);
+        }
+      }
+    });
+    
+    return { labels, data: last7Days };
+  };
+
+  // Calculate Income vs Expenses for current month
+  const calculateIncomeVsExpenses = () => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    let monthIncome = 0;
+    let monthExpense = 0;
+    
+    allTransactions.forEach((t) => {
+      const transDate = new Date(t.date);
+      if (transDate.getMonth() === currentMonth && transDate.getFullYear() === currentYear) {
+        if (t.type === 'Income') {
+          monthIncome += t.amount;
+        } else {
+          monthExpense += Math.abs(t.amount);
+        }
+      }
+    });
+    
+    return {
+      labels: ['Income', 'Expenses'],
+      data: [monthIncome, monthExpense],
+    };
+  };
+
+  const spendingTrendData = calculateSpendingTrend();
+  const incomeVsExpensesData = calculateIncomeVsExpenses();
+
   // --- styles ---
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -493,12 +549,13 @@ export default function HomeScreen() {
     },
     summaryBox: {
       backgroundColor: colors.background,
-      padding: 15,
+      padding: 12,
       borderRadius: 12,
       flex: 1,
       marginHorizontal: 5,
       alignItems: 'center',
       elevation: 2,
+      overflow: 'hidden',
     },
     incomeBox: { backgroundColor: colors.income + '20' },
     expenseBox: { backgroundColor: colors.expense + '20' },
@@ -508,18 +565,32 @@ export default function HomeScreen() {
       color: colors.textSecondary,
       marginBottom: 6,
       fontWeight: '500',
+      textAlign: 'center',
+      width: '100%',
     },
     incomeText: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: 'bold',
       color: colors.income,
+      textAlign: 'center',
+      width: '100%',
+      paddingHorizontal: 2,
     },
     expenseText: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: 'bold',
       color: colors.expense,
+      textAlign: 'center',
+      width: '100%',
+      paddingHorizontal: 2,
     },
-    balanceText: { fontSize: 16, fontWeight: 'bold' },
+    balanceText: { 
+      fontSize: 14, 
+      fontWeight: 'bold',
+      textAlign: 'center',
+      width: '100%',
+      paddingHorizontal: 2,
+    },
 
     allowanceCard: {
       backgroundColor: colors.cardBackground,
@@ -589,6 +660,36 @@ export default function HomeScreen() {
       borderRadius: 12,
       padding: 16,
       elevation: 3,
+    },
+    chartHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    chartSelector: {
+      flexDirection: 'row',
+      backgroundColor: colors.border,
+      borderRadius: 8,
+      padding: 3,
+    },
+    chartTypeButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 6,
+    },
+    chartTypeButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    chartTypeText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    chartTypeTextActive: {
+      color: '#fff',
     },
 
     calendarSection: {
@@ -873,13 +974,13 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.headerButtons}>
-          <TouchableOpacity onPress={() => router.push('/notifications')}>
+          <TouchableOpacity onPress={() => router.push('/notifications?returnTo=/(tabs)')}>
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/settings')} style={{ marginLeft: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/settings?returnTo=/(tabs)')} style={{ marginLeft: 16 }}>
             <Ionicons name="settings-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={{ marginLeft: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile?returnTo=/(tabs)')} style={{ marginLeft: 16 }}>
            <Ionicons name="person-circle-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -888,11 +989,15 @@ export default function HomeScreen() {
       <View style={styles.summaryContainer}>
         <View style={[styles.summaryBox, styles.incomeBox]}>
           <Text style={styles.summaryLabel}>Income</Text>
-          <Text style={styles.incomeText}>${totalIncome.toFixed(2)}</Text>
+          <Text style={styles.incomeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            ${totalIncome.toFixed(2)}
+          </Text>
         </View>
         <View style={[styles.summaryBox, styles.expenseBox]}>
           <Text style={styles.summaryLabel}>Expenses</Text>
-          <Text style={styles.expenseText}>${totalExpense.toFixed(2)}</Text>
+          <Text style={styles.expenseText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            ${totalExpense.toFixed(2)}
+          </Text>
         </View>
         <View style={[styles.summaryBox, styles.balanceBox]}>
           <Text style={styles.summaryLabel}>Balance</Text>
@@ -903,6 +1008,9 @@ export default function HomeScreen() {
                 color: totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336',
               },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
           >
             ${(totalIncome - totalExpense).toFixed(2)}
           </Text>
@@ -971,23 +1079,123 @@ export default function HomeScreen() {
         </Text>
       </TouchableOpacity>
 
+      {/* Charts Section with Type Selector */}
       <View style={styles.chartCard}>
-        <Text style={styles.sectionTitle}>Expense Breakdown</Text>
-        <PieChart
-          data={chartData}
-          width={screenWidth - 40}
-          height={220}
-          chartConfig={{
-            backgroundGradientFrom: colors.cardBackground,
-            backgroundGradientTo: colors.cardBackground,
-            color: (opacity = 1) => colors.text + Math.round(opacity * 255).toString(16),
-            strokeWidth: 2,
-          }}
-          accessor="amount"
-          backgroundColor="transparent"
-          paddingLeft="15"
-          absolute
-        />
+        <View style={styles.chartHeader}>
+          <Text style={[styles.sectionTitle, { flex: 1, flexShrink: 1 }]}>
+            {selectedChartType === 'pie' && '📊 Expense Breakdown'}
+            {selectedChartType === 'line' && '📈 7-Day Trend'}
+            {selectedChartType === 'bar' && '💰 Income vs Expenses'}
+          </Text>
+          <View style={styles.chartSelector}>
+            <TouchableOpacity
+              style={[styles.chartTypeButton, selectedChartType === 'pie' && styles.chartTypeButtonActive]}
+              onPress={() => setSelectedChartType('pie')}
+            >
+              <Text style={[styles.chartTypeText, selectedChartType === 'pie' && styles.chartTypeTextActive]}>
+                Pie
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chartTypeButton, selectedChartType === 'line' && styles.chartTypeButtonActive]}
+              onPress={() => setSelectedChartType('line')}
+            >
+              <Text style={[styles.chartTypeText, selectedChartType === 'line' && styles.chartTypeTextActive]}>
+                Line
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chartTypeButton, selectedChartType === 'bar' && styles.chartTypeButtonActive]}
+              onPress={() => setSelectedChartType('bar')}
+            >
+              <Text style={[styles.chartTypeText, selectedChartType === 'bar' && styles.chartTypeTextActive]}>
+                Bar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Pie Chart - Expense Breakdown */}
+        {selectedChartType === 'pie' && (
+          <PieChart
+            data={chartData}
+            width={screenWidth - 72}
+            height={220}
+            chartConfig={{
+              backgroundGradientFrom: colors.cardBackground,
+              backgroundGradientTo: colors.cardBackground,
+              color: (opacity = 1) => colors.text + Math.round(opacity * 255).toString(16),
+              strokeWidth: 2,
+            }}
+            accessor="amount"
+            backgroundColor="transparent"
+            paddingLeft="15"
+            absolute
+          />
+        )}
+
+        {/* Line Chart - 7-Day Spending Trend */}
+        {selectedChartType === 'line' && (
+          <LineChart
+            data={{
+              labels: spendingTrendData.labels,
+              datasets: [{ data: spendingTrendData.data.length > 0 ? spendingTrendData.data : [0] }],
+            }}
+            width={screenWidth - 72}
+            height={220}
+            yAxisLabel="$"
+            yAxisSuffix=""
+            chartConfig={{
+              backgroundColor: colors.cardBackground,
+              backgroundGradientFrom: colors.cardBackground,
+              backgroundGradientTo: colors.cardBackground,
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(66, 165, 245, ${opacity})`,
+              labelColor: (opacity = 1) => colors.text,
+              style: { borderRadius: 16 },
+              propsForDots: {
+                r: '6',
+                strokeWidth: '2',
+                stroke: '#42A5F5',
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+            }}
+          />
+        )}
+
+        {/* Bar Chart - Income vs Expenses */}
+        {selectedChartType === 'bar' && (
+          <BarChart
+            data={{
+              labels: incomeVsExpensesData.labels,
+              datasets: [{ data: incomeVsExpensesData.data.length > 0 ? incomeVsExpensesData.data : [0, 0] }],
+            }}
+            width={screenWidth - 72}
+            height={220}
+            yAxisLabel="$"
+            yAxisSuffix=""
+            chartConfig={{
+              backgroundColor: colors.cardBackground,
+              backgroundGradientFrom: colors.cardBackground,
+              backgroundGradientTo: colors.cardBackground,
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(102, 187, 106, ${opacity})`,
+              labelColor: (opacity = 1) => colors.text,
+              style: { borderRadius: 16 },
+              barPercentage: 0.7,
+            }}
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+            }}
+            showValuesOnTopOfBars
+            fromZero
+          />
+        )}
       </View>
 
       <View style={styles.calendarSection}>
@@ -1028,7 +1236,7 @@ export default function HomeScreen() {
 
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/add-transaction')}>
+        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/add-transaction?returnTo=/(tabs)')}>
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
@@ -1038,7 +1246,7 @@ export default function HomeScreen() {
           <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
           <Text style={styles.emptyText}>No transactions</Text>
           <Text style={styles.emptySubtext}>Add your first transaction to get started!</Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/add-transaction')}>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/add-transaction?returnTo=/(tabs)')}>
             <Text style={styles.emptyButtonText}>Add Transaction</Text>
           </TouchableOpacity>
         </View>
@@ -1206,7 +1414,7 @@ export default function HomeScreen() {
               style={styles.quickAddButton}
               onPress={() => {
                 setIsDateDetailVisible(false);
-                router.push('/(tabs)/add-transaction');
+                router.push('/(tabs)/add-transaction?returnTo=/(tabs)');
               }}
             >
               <Ionicons name="add-circle-outline" size={24} color="#fff" />

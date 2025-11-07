@@ -152,28 +152,91 @@ router.patch('/monthly-allowance', auth, async (req, res) => {
   }
 });
 // PUT /api/auth/update-profile
-router.put('/update-profile', async (req, res) => {
+router.put('/update-profile', auth, async (req, res) => {
   try {
     const { username, email, monthlyAllowance } = req.body;
 
-    // In a real app, you’d find and update the user in MongoDB:
-    // const userId = req.user.id;  // if using JWT middleware
-    // const user = await User.findByIdAndUpdate(userId, { username, email, monthlyAllowance }, { new: true });
+    // Build update object with only provided fields
+    const updateData = {};
+    if (username !== undefined) updateData.username = username;
+    if (email !== undefined) updateData.email = email;
+    if (monthlyAllowance !== undefined) updateData.monthlyAllowance = monthlyAllowance;
 
-    console.log('Updating user profile:', { username, email, monthlyAllowance });
+    // Check if email is already taken by another user
+    if (email) {
+      const existingUser = await User.findOne({ email, _id: { $ne: req.userId } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Email already in use' });
+      }
+    }
 
-    // Mock success response for now
+    // Check if username is already taken by another user
+    if (username) {
+      const existingUser = await User.findOne({ username, _id: { $ne: req.userId } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already in use' });
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     res.json({
-      message: 'Profile updated successfully',
-      user: {
-        username,
-        email,
-        monthlyAllowance,
-      },
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      monthlyAllowance: user.monthlyAllowance || 0,
     });
   } catch (err) {
     console.error('Error updating profile:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Server error updating profile' });
+  }
+});
+
+// POST /api/auth/change-password
+router.post('/change-password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Find user and include password for verification
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    console.error('Error changing password:', err);
+    res.status(500).json({ error: 'Server error changing password' });
   }
 });
 

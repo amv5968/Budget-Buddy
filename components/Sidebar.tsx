@@ -62,14 +62,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       icon: '📘',
       description: 'Financial education and tools',
       route: '/(tabs)/resources',
-    },
-    {
-      id: 'profile',
-      title: 'Profile',
-      icon: '👤',
-      description: 'View and edit your personal information',
-      route: '/(tabs)/profile',
-    },
+    }
   ];
 
   return (

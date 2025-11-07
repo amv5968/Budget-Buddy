@@ -1,5 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
@@ -10,14 +11,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
-import { 
-  getAllNotifications, 
+import {
   clearAllNotifications,
-  requestNotificationPermissions 
+  getAllNotifications,
+  requestNotificationPermissions
 } from './services/notificationService';
-import * as Notifications from 'expo-notifications';
 
 const SETTINGS_KEY = 'bb.settings.v1';
 
@@ -34,6 +33,8 @@ interface Notification {
 const NotificationsScreen: React.FC = () => {
   const { colors } = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)';
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [budgetAlerts, setBudgetAlerts] = useState(true);
@@ -247,6 +248,11 @@ const NotificationsScreen: React.FC = () => {
       padding: 8,
       alignSelf: 'flex-start',
     },
+    backText: {
+      fontSize: 16,
+      color: '#2196F3',
+      fontWeight: '600',
+    },
     headerRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -403,15 +409,19 @@ const NotificationsScreen: React.FC = () => {
     },
   });
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <View style={dynamicStyles.container}>
       {/* Header */}
       <View style={dynamicStyles.headerSection}>
         <TouchableOpacity 
-          onPress={() => router.back()} 
+          onPress={handleGoBack} 
           style={dynamicStyles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Text style={dynamicStyles.backText}>← Back</Text>
         </TouchableOpacity>
         <View style={dynamicStyles.headerRow}>
           <Text style={dynamicStyles.title}>🔔 Notifications</Text>

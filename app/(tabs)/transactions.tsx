@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,6 +52,13 @@ export default function TransactionsScreen() {
   useEffect(() => {
     loadTransactions();
   }, []);
+
+  // Refresh transactions when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadTransactions();
+    }, [])
+  );
 
   const loadTransactions = async () => {
     try {
@@ -422,7 +429,7 @@ export default function TransactionsScreen() {
         <Text style={styles.headerText}>Transactions</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push('/(tabs)/add-transaction')}
+          onPress={() => router.push('/(tabs)/add-transaction?returnTo=/(tabs)/transactions')}
         >
           <Ionicons name="add-circle" size={28} color="#66BB6A" />
         </TouchableOpacity>

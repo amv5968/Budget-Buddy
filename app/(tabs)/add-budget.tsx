@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { addBudget } from '../services/budgetService';
 
 const BUDGET_CATEGORIES = [
@@ -27,6 +27,8 @@ const BUDGET_CATEGORIES = [
 
 export default function AddBudgetScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)/budgets';
   const [category, setCategory] = useState('');
   const [icon, setIcon] = useState('');
   const [amount, setAmount] = useState('');
@@ -52,7 +54,7 @@ export default function AddBudgetScreen() {
       });
 
       Alert.alert('Success', 'Budget created successfully!');
-      router.back();
+      router.navigate(returnTo as any);
     } catch (error: any) {
       console.error('Error creating budget:', error);
       const errorMessage = error.response?.data?.error || 'Failed to create budget';
@@ -62,10 +64,14 @@ export default function AddBudgetScreen() {
     }
   };
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Create Budget</Text>

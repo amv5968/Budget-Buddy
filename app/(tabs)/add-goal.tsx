@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { addGoal, deleteGoal } from '../services/goalService';
 
 interface Goal {
@@ -37,7 +37,9 @@ const GOAL_ICONS = [
 
 export default function AddGoalScreen() {
   const router = useRouter();
-  const { goal } = useLocalSearchParams<{ goal?: string }>();
+  const params = useLocalSearchParams<{ goal?: string; returnTo?: string }>();
+  const { goal } = params;
+  const returnTo = (params.returnTo as string) || '/(tabs)/goals';
 
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
@@ -116,10 +118,14 @@ export default function AddGoalScreen() {
     ]);
   };
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backText}>{'\u{2190}'} Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{isEditing ? 'Edit Savings Goal' : 'Create Savings Goal'}</Text>

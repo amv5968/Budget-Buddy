@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { maybeTriggerThresholdAlerts, notifyNewTransaction } from '../services/notificationService';
 import { addTransaction } from '../services/transactionService';
-import { notifyNewTransaction, maybeTriggerThresholdAlerts } from '../services/notificationService';
 
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
 const EXPENSE_CATEGORIES = [
@@ -29,6 +29,8 @@ const EXPENSE_CATEGORIES = [
 
 export default function AddTransactionScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)';
   const [type, setType] = useState<'Income' | 'Expense'>('Expense');
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
@@ -63,7 +65,7 @@ export default function AddTransactionScreen() {
       await maybeTriggerThresholdAlerts(newTransaction);
 
       Alert.alert('Success', 'Transaction added successfully!');
-      router.back();
+      router.navigate(returnTo as any);
     } catch (error: any) {
       console.error('Error adding transaction:', error);
       const errorMessage = error.response?.data?.error || 'Failed to add transaction';
@@ -73,10 +75,14 @@ export default function AddTransactionScreen() {
     }
   };
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Add Transaction</Text>

@@ -26,7 +26,7 @@ app.use('/api/budgets', budgetRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/reminders', remindersRouter); // <-- mount reminders API
 app.use('/api/users', usersRoutes);
-app.use('/subscriptions', require('./routes/subscriptions.routes'));
+app.use('/api/subscriptions', require('./routes/subscriptions.routes'));
 
 // health check
 app.get('/api/health', (req, res) => {

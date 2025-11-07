@@ -1,23 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  TextInput,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
-import { getUserProfile, updateUserProfile } from '../services/authService';
-import { getTransactionStats } from '../services/transactionService';
-import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { BarChart, LineChart } from 'react-native-chart-kit';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { changePassword, getUserProfile, updateUserProfile } from '../services/authService';
+import { getTransactionStats, getTransactions } from '../services/transactionService';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)';
   const { colors } = useTheme();
   const { user, logout } = useAuth();
 
@@ -28,6 +38,17 @@ export default function ProfileScreen() {
     monthlyAllowance: 0,
   });
   const [editing, setEditing] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [spendingTrend, setSpendingTrend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState<{ [key: string]: number }>({});
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const fallbackAvatar = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
@@ -37,11 +58,41 @@ export default function ProfileScreen() {
       try {
         const profileData = await getUserProfile();
         const data = await getTransactionStats();
+        const transData = await getTransactions();
+        
         setStats(data);
-        setProfile((prev) => ({
-          ...prev,
+        setTransactions(transData);
+        setProfile({
+          username: profileData.username || '',
+          email: profileData.email || '',
           monthlyAllowance: profileData.monthlyAllowance || 0,
-        }));
+        });
+
+        // Calculate spending trend for last 7 days
+        const last7Days = Array(7).fill(0);
+        const today = new Date();
+        
+        transData.forEach((t: any) => {
+          if (t.type === 'Expense') {
+            const transDate = new Date(t.date);
+            const diffTime = today.getTime() - transDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays >= 0 && diffDays < 7) {
+              last7Days[6 - diffDays] += t.amount;
+            }
+          }
+        });
+        setSpendingTrend(last7Days);
+
+        // Calculate category breakdown
+        const categories: { [key: string]: number } = {};
+        transData.forEach((t: any) => {
+          if (t.type === 'Expense') {
+            categories[t.category] = (categories[t.category] || 0) + t.amount;
+          }
+        });
+        setCategoryBreakdown(categories);
       } catch (err) {
         console.error('Error loading profile:', err);
       }
@@ -82,13 +133,71 @@ export default function ProfileScreen() {
 
   // Save Profile
   const handleSave = async () => {
+    // Validation
+    if (!profile.username.trim()) {
+      Alert.alert('Error', 'Username cannot be empty');
+      return;
+    }
+    
+    if (!profile.email.trim() || !profile.email.includes('@')) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (profile.monthlyAllowance < 0) {
+      Alert.alert('Error', 'Monthly allowance cannot be negative');
+      return;
+    }
+
+    setSavingProfile(true);
     try {
-      await updateUserProfile(profile);
+      const updatedProfile = await updateUserProfile({
+        username: profile.username,
+        email: profile.email,
+        monthlyAllowance: profile.monthlyAllowance,
+      });
+      
+      setProfile(updatedProfile);
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving profile:', err);
-      Alert.alert('Error', 'Unable to save profile changes.');
+      const errorMessage = err.response?.data?.error || 'Unable to save profile changes.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  // Change Password
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      Alert.alert('Error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      Alert.alert('Error', 'New password must be at least 6 characters long');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
+      setShowPasswordModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      Alert.alert('Success', 'Password changed successfully!');
+    } catch (err: any) {
+      console.error('Error changing password:', err);
+      const errorMessage = err.response?.data?.error || 'Unable to change password.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -96,12 +205,31 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
+      { 
+        text: 'Logout', 
+        style: 'destructive', 
+        onPress: async () => {
+          await logout();
+          // Navigate to login screen
+          router.replace('/(auth)/login');
+        }
+      },
     ]);
+  };
+
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
   };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Back Button */}
+      <View style={styles.backButtonContainer}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* HEADER */}
       <View style={styles.header}>
         <Image
@@ -149,6 +277,138 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Net Balance */}
+        <View style={styles.balanceCard}>
+          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Net Balance</Text>
+          <Text style={[
+            styles.balanceValue, 
+            { color: (stats.totalIncome - stats.totalExpense) >= 0 ? colors.income : colors.expense }
+          ]}>
+            ${(stats.totalIncome - stats.totalExpense).toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      {/* SPENDING TREND CHART */}
+      {spendingTrend.some(v => v > 0) && (
+        <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>📈 Spending Trend (Last 7 Days)</Text>
+          <LineChart
+            data={{
+              labels: ['6d', '5d', '4d', '3d', '2d', '1d', 'Today'],
+              datasets: [{
+                data: spendingTrend.map(v => v || 0.1), // Prevent zero values
+              }],
+            }}
+            width={screenWidth - 72}
+            height={200}
+            yAxisLabel="$"
+            yAxisSuffix=""
+            chartConfig={{
+              backgroundColor: colors.cardBackground,
+              backgroundGradientFrom: colors.cardBackground,
+              backgroundGradientTo: colors.cardBackground,
+              decimalPlaces: 0,
+              color: (opacity = 1) => colors.expense,
+              labelColor: (opacity = 1) => colors.textSecondary,
+              style: {
+                borderRadius: 16,
+              },
+              propsForDots: {
+                r: '4',
+                strokeWidth: '2',
+                stroke: colors.expense,
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+            }}
+          />
+        </View>
+      )}
+
+      {/* CATEGORY BREAKDOWN CHART */}
+      {Object.keys(categoryBreakdown).length > 0 && (
+        <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>📊 Top Spending Categories</Text>
+          <BarChart
+            data={{
+              labels: Object.keys(categoryBreakdown).slice(0, 5).map(c => c.substring(0, 8)),
+              datasets: [{
+                data: Object.values(categoryBreakdown).slice(0, 5),
+              }],
+            }}
+            width={screenWidth - 72}
+            height={220}
+            yAxisLabel="$"
+            yAxisSuffix=""
+            chartConfig={{
+              backgroundColor: colors.cardBackground,
+              backgroundGradientFrom: colors.cardBackground,
+              backgroundGradientTo: colors.cardBackground,
+              decimalPlaces: 0,
+              color: (opacity = 1) => colors.primary,
+              labelColor: (opacity = 1) => colors.textSecondary,
+              style: {
+                borderRadius: 16,
+              },
+            }}
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+            }}
+          />
+        </View>
+      )}
+
+      {/* INSIGHTS */}
+      <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>💡 Financial Insights</Text>
+        
+        <View style={styles.insightRow}>
+          <Text style={{ fontSize: 28 }}>📅</Text>
+          <View style={styles.insightContent}>
+            <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>
+              Total Transactions
+            </Text>
+            <Text style={[styles.insightValue, { color: colors.text }]}>
+              {transactions.length} transactions
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.insightRow}>
+          <Text style={{ fontSize: 28 }}>💰</Text>
+          <View style={styles.insightContent}>
+            <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>
+              Savings Rate
+            </Text>
+            <Text style={[styles.insightValue, { color: colors.text }]}>
+              {stats.totalIncome > 0 
+                ? `${(((stats.totalIncome - stats.totalExpense) / stats.totalIncome) * 100).toFixed(1)}%`
+                : '0%'
+              }
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.insightRow}>
+          <Text style={{ fontSize: 28 }}>📊</Text>
+          <View style={styles.insightContent}>
+            <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>
+              Avg Transaction
+            </Text>
+            <Text style={[styles.insightValue, { color: colors.text }]}>
+              ${transactions.length > 0 
+                ? (stats.totalExpense / transactions.filter(t => t.type === 'Expense').length || 0).toFixed(2)
+                : '0.00'
+              }
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* EDIT PROFILE */}
@@ -181,12 +441,26 @@ export default function ProfileScreen() {
         />
 
         {editing ? (
-          <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: colors.primary }]}
-            onPress={handleSave}
-          >
-            <Text style={styles.saveButtonText}>Save Changes</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.cancelButton, { borderColor: colors.border }]}
+              onPress={() => setEditing(false)}
+              disabled={savingProfile}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: colors.primary }]}
+              onPress={handleSave}
+              disabled={savingProfile}
+            >
+              {savingProfile ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         ) : (
           <TouchableOpacity
             style={[styles.editButton, { borderColor: colors.primary }]}
@@ -198,6 +472,22 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      {/* SECURITY */}
+      <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Security</Text>
+        
+        <TouchableOpacity
+          style={[styles.passwordButton, { borderColor: colors.border }]}
+          onPress={() => setShowPasswordModal(true)}
+        >
+          <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+          <Text style={[styles.passwordButtonText, { color: colors.text }]}>
+            Change Password
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       {/* ACTIONS */}
@@ -214,12 +504,88 @@ export default function ProfileScreen() {
           <Text style={[styles.optionText, { color: 'red' }]}>Logout</Text>
         </TouchableOpacity>
       </View>
+
+      {/* PASSWORD CHANGE MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showPasswordModal}
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Change Password</Text>
+              <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
+                <Ionicons name="close" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Current Password</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                placeholder="Enter current password"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                value={passwordData.currentPassword}
+                onChangeText={(text) => setPasswordData({ ...passwordData, currentPassword: text })}
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.text }]}>New Password</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                placeholder="Enter new password (min 6 characters)"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                value={passwordData.newPassword}
+                onChangeText={(text) => setPasswordData({ ...passwordData, newPassword: text })}
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Confirm New Password</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                placeholder="Re-enter new password"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                value={passwordData.confirmPassword}
+                onChangeText={(text) => setPasswordData({ ...passwordData, confirmPassword: text })}
+              />
+
+              <View style={styles.passwordTips}>
+                <Text style={[styles.tipsTitle, { color: colors.text }]}>Password Requirements:</Text>
+                <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
+                  • At least 6 characters long
+                </Text>
+                <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
+                  • Use a mix of letters, numbers, and symbols
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
+              onPress={handleChangePassword}
+              disabled={changingPassword}
+            >
+              {changingPassword ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.modalSaveText}>Change Password</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 50 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  backButtonContainer: { marginBottom: 10 },
+  backButton: { padding: 8, alignSelf: 'flex-start' },
+  backText: { fontSize: 16, color: '#2196F3', fontWeight: '600' },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 25 },
   avatar: { width: 70, height: 70, borderRadius: 35, marginRight: 16 },
   name: { fontSize: 22, fontWeight: 'bold' },
@@ -230,11 +596,64 @@ const styles = StyleSheet.create({
   statBox: { alignItems: 'center', flex: 1 },
   statLabel: { fontSize: 13, marginBottom: 4 },
   statValue: { fontSize: 16, fontWeight: 'bold' },
+  balanceCard: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  balanceValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128, 128, 128, 0.1)',
+  },
+  insightContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  insightLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  insightValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
+    fontSize: 15,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    fontWeight: '600',
     fontSize: 15,
   },
   editButton: {
@@ -247,11 +666,85 @@ const styles = StyleSheet.create({
   },
   editButtonText: { marginLeft: 8, fontWeight: '600', fontSize: 15 },
   saveButton: {
+    flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  passwordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  passwordButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: 12,
+  },
   option: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   optionText: { fontSize: 15, marginLeft: 12, fontWeight: '500' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  passwordTips: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(100, 100, 100, 0.1)',
+    borderRadius: 8,
+  },
+  tipsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  tipsText: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  modalSaveButton: {
+    margin: 20,
+    marginTop: 0,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });

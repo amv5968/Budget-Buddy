@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -11,14 +11,15 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
-import { scheduleWeeklySummary, scheduleDailyTransactionReminder } from './services/notificationService';
+import { scheduleDailyTransactionReminder, scheduleWeeklySummary } from './services/notificationService';
 
 const SETTINGS_KEY = 'bb.settings.v1';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)';
   const { theme, themeMode, setThemeMode, colors } = useTheme();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -171,9 +172,12 @@ const handleSave = async () => {
     },
     backButton: {
       marginRight: 12,
-      backgroundColor: colors.border,
       padding: 8,
-      borderRadius: 8,
+    },
+    backText: {
+      fontSize: 16,
+      color: '#2196F3',
+      fontWeight: '600',
     },
     header: {
       fontSize: 26,
@@ -282,12 +286,16 @@ const handleSave = async () => {
     },
   });
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <ScrollView contentContainerStyle={dynamicStyles.container}>
       {/* Header with Back Button */}
       <View style={dynamicStyles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} style={dynamicStyles.backButton}>
-          <Ionicons name="arrow-back" size={26} color={colors.text} />
+        <TouchableOpacity onPress={handleGoBack} style={dynamicStyles.backButton}>
+          <Text style={dynamicStyles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={dynamicStyles.header}>Settings</Text>
       </View>
