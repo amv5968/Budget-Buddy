@@ -123,6 +123,13 @@ const ResourcesScreen: React.FC = () => {
       desc: 'Information and requirements on filing taxes in PA.',
       icon: '📝',
     },
+    {
+      category: 'Learning',
+      title: 'Tax information for students',
+      url: 'https://www.irs.gov/individuals/students',
+      desc: 'Student-specific tax information.',
+      icon: '✍️',
+    },
   ];
 
   const studentTips: Tip[] = [
