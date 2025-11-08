@@ -37,6 +37,6 @@ export const updateBudgetSpent = async (
   return response.data;
 };
 
-export const getTotalBudgetsAmount = (budgets: Budget[]): number => {
+export const getTotalBudget = (budgets: Budget[]): number => {
   return budgets.reduce((total, budget) => total + budget.totalAmount, 0);
 };
