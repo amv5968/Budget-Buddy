@@ -50,6 +50,20 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       route: '/(tabs)/ai-assistant',
     },
     {
+      id: 'connected-accounts',
+      title: 'Connected Accounts',
+      icon: '🏦',
+      description: 'Link your banks and credit cards',
+      route: '/connected-accounts',
+    },
+    {
+      id: 'recurring-transactions',
+      title: 'Recurring Transactions',
+      icon: '🔄',
+      description: 'Manage automatic recurring payments',
+      route: '/recurring-transactions',
+    },
+    {
       id: 'subscriptions',
       title: 'Subscriptions',
       icon: '💳',

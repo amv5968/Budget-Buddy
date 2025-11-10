@@ -220,6 +220,14 @@ export default function TransactionsScreen() {
     transactionInfo: { flex: 1 },
     transactionName: { fontSize: 16, fontWeight: '600', marginBottom: 4, color: colors.text },
     transactionCategory: { fontSize: 13, color: colors.textSecondary },
+    recurringBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    recurringBadgeText: {
+      fontSize: 10,
+    },
     transactionRight: { alignItems: 'flex-end' },
     transactionAmount: { fontSize: 18, fontWeight: 'bold', marginBottom: 2 },
     transactionDate: { fontSize: 12, color: colors.textSecondary },
@@ -474,7 +482,14 @@ export default function TransactionsScreen() {
               <Text style={styles.icon}>💵</Text>
             </View>
             <View style={styles.transactionInfo}>
-              <Text style={styles.transactionName}>{item.category}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.transactionName}>{item.category}</Text>
+                {item.parentRecurringId && (
+                  <View style={[styles.recurringBadge, { backgroundColor: colors.primary + '20', marginLeft: 6 }]}>
+                    <Text style={[styles.recurringBadgeText, { color: colors.primary }]}>🔄</Text>
+                  </View>
+                )}
+              </View>
               <Text style={styles.transactionCategory}>{item.description}</Text>
             </View>
             <View style={styles.transactionRight}>

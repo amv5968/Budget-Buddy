@@ -2,6 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const auth = require('../middleware/auth');
+const {
+  processRecurringTransactions,
+  processSubscriptions,
+  createRecurringTransaction,
+  stopRecurringTransaction,
+  getActiveRecurringTransactions
+} = require('../services/recurringTransactionService');
 
 const router = express.Router();
 
@@ -9,7 +16,7 @@ router.post('/', auth, async (req, res) => {
   try {
     const { type, category, amount, description, date } = req.body;
 
-    console.log('➕ Creating transaction:', { type, category, amount, userId: req.userId });
+    console.log('Creating transaction:', { type, category, amount, userId: req.userId });
 
     if (!type || !category || amount === undefined) {
       return res.status(400).json({ error: 'Required fields missing' });
@@ -25,10 +32,10 @@ router.post('/', auth, async (req, res) => {
     });
 
     await transaction.save();
-    console.log('✅ Transaction saved:', transaction);
+    console.log('Transaction saved:', transaction);
     res.status(201).json(transaction);
   } catch (error) {
-    console.error('❌ Transaction creation error:', error);
+    console.error('Transaction creation error:', error);
     res.status(500).json({ error: 'Server error creating transaction' });
   }
 });
@@ -47,13 +54,11 @@ router.get('/', auth, async (req, res) => {
 
 router.get('/stats', auth, async (req, res) => {
   try {
-    console.log('📊 Fetching stats for userId:', req.userId);
+    console.log('Fetching stats for userId:', req.userId);
     
-    // Get all transactions for this user
     const allTransactions = await Transaction.find({ userId: req.userId });
-    console.log('📝 Total transactions found:', allTransactions.length);
+    console.log('Total transactions found:', allTransactions.length);
     
-    // Calculate income and expense
     let totalIncome = 0;
     let totalExpense = 0;
     
@@ -116,6 +121,75 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) {
     console.error('Delete transaction error:', error);
     res.status(500).json({ error: 'Server error deleting transaction' });
+  }
+});
+
+router.get('/recurring', auth, async (req, res) => {
+  try {
+    const recurringTransactions = await getActiveRecurringTransactions(req.userId);
+    res.json(recurringTransactions);
+  } catch (error) {
+    console.error('Get recurring transactions error:', error);
+    res.status(500).json({ error: 'Server error fetching recurring transactions' });
+  }
+});
+
+router.post('/recurring', auth, async (req, res) => {
+  try {
+    const { type, category, amount, description, frequency, startDate, endDate } = req.body;
+
+    if (!type || !category || !amount || !frequency) {
+      return res.status(400).json({ error: 'Required fields missing' });
+    }
+
+    if (!['daily', 'weekly', 'monthly', 'yearly'].includes(frequency)) {
+      return res.status(400).json({ error: 'Invalid frequency' });
+    }
+
+    const result = await createRecurringTransaction(req.userId, {
+      type,
+      category,
+      amount,
+      description: description || '',
+      frequency,
+      startDate,
+      endDate
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Create recurring transaction error:', error);
+    res.status(500).json({ error: 'Server error creating recurring transaction' });
+  }
+});
+
+router.post('/recurring/:id/stop', auth, async (req, res) => {
+  try {
+    const transaction = await stopRecurringTransaction(req.params.id, req.userId);
+    res.json({ message: 'Recurring transaction stopped', transaction });
+  } catch (error) {
+    console.error('Stop recurring transaction error:', error);
+    res.status(500).json({ error: error.message || 'Server error stopping recurring transaction' });
+  }
+});
+
+router.post('/recurring/process', auth, async (req, res) => {
+  try {
+    const results = await processRecurringTransactions();
+    res.json(results);
+  } catch (error) {
+    console.error('Process recurring transactions error:', error);
+    res.status(500).json({ error: 'Server error processing recurring transactions' });
+  }
+});
+
+router.post('/subscriptions/process', auth, async (req, res) => {
+  try {
+    const results = await processSubscriptions();
+    res.json(results);
+  } catch (error) {
+    console.error('Process subscriptions error:', error);
+    res.status(500).json({ error: 'Server error processing subscriptions' });
   }
 });
 
