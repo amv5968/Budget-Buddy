@@ -28,6 +28,8 @@ import {
 } from '../services/notificationService';
 import { addReminder, getReminders, getRemindersForDate } from '../services/reminderService';
 
+import { Budget, getBudgets } from '../services/budgetService';
+import { getGoals, Goal } from '../services/goalService';
 import {
   getTransactions,
   getTransactionStats,
@@ -46,6 +48,8 @@ export default function HomeScreen() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
 
   // --- ui / fetch state ---
   const [loading, setLoading] = useState(true);
@@ -73,6 +77,10 @@ export default function HomeScreen() {
   const [allRemindersByDate, setAllRemindersByDate] = useState<
     Record<string, { time: string; message: string }[]>
   >({});
+
+  // --- pie chart interactivity ---
+  const [selectedCategory, setSelectedCategory] = useState<{ name: string; amount: number; percentage: number } | null>(null);
+  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
 
   // --- derived allowance stats (used in UI) ---
   const remaining = monthlyAllowance - totalExpense;
@@ -187,19 +195,25 @@ export default function HomeScreen() {
   // --- load dashboard data: transactions + stats ---
   const loadData = async () => {
     try {
-      const [transData, statsData, profile] = await Promise.all([
+      const [transData, statsData, profile, goalsData, budgetsData] = await Promise.all([
         getTransactions(),
         getTransactionStats(),
         getUserProfile(), // refresh allowance from backend too
+        getGoals(),
+        getBudgets(),
       ]);
 
       setMonthlyAllowance(profile.monthlyAllowance);
       setTempAllowance(profile.monthlyAllowance.toString());
 
       setAllTransactions(transData);
-      setTransactions(transData.slice(0, 5));
+      setTransactions(transData.slice(0, 4));
       setTotalIncome(statsData.totalIncome);
       setTotalExpense(statsData.totalExpense);
+      
+      // Sort by createdAt descending and take last 4
+      setGoals(goalsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4));
+      setBudgets(budgetsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4));
 
       checkSpendingAlerts(statsData.totalExpense, profile.monthlyAllowance);
     } catch (error: any) {
@@ -431,16 +445,24 @@ export default function HomeScreen() {
       }
     });
 
+    const totalExpense = Object.values(categoryTotals).reduce((sum, val) => sum + Math.abs(val), 0);
     const pieColors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#FFC107', '#00BCD4'];
 
     const chartData = Object.entries(categoryTotals)
-      .map(([name, amount], index) => ({
-        name,
-        amount: Math.abs(amount),
-        color: pieColors[index % pieColors.length],
-        legendFontColor: colors.text,
-        legendFontSize: 13,
-      }))
+      .map(([name, amount], index) => {
+        const absAmount = Math.abs(amount);
+        const percentage = totalExpense > 0 ? (absAmount / totalExpense) * 100 : 0;
+        // Truncate long names for display but keep full name for tooltip
+        const displayName = name.length > 12 ? name.substring(0, 10) + '...' : name;
+        return {
+          name: displayName,
+          fullName: name,
+          amount: absAmount,
+          percentage: percentage,
+          color: pieColors[index % pieColors.length],
+          legendFontColor: colors.text,
+        };
+      })
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
@@ -449,10 +471,11 @@ export default function HomeScreen() {
       : [
           {
             name: 'No Data',
+            fullName: 'No Data',
             amount: 1,
+            percentage: 0,
             color: '#E0E0E0',
             legendFontColor: colors.textSecondary,
-            legendFontSize: 13,
           },
         ];
   };
@@ -691,6 +714,98 @@ export default function HomeScreen() {
     chartTypeTextActive: {
       color: '#fff',
     },
+    pieLegendContainer: {
+      marginTop: 12,
+      paddingHorizontal: 8,
+    },
+    pieLegendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      marginBottom: 6,
+    },
+    pieLegendColor: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      marginRight: 12,
+    },
+    pieLegendTextContainer: {
+      flex: 1,
+    },
+    pieLegendName: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    pieLegendAmount: {
+      fontSize: 12,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    categoryModalBody: {
+      alignItems: 'center',
+    },
+    categoryModalIcon: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    categoryModalEmoji: {
+      fontSize: 40,
+    },
+    categoryModalName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 24,
+      textAlign: 'center',
+    },
+    categoryModalStats: {
+      flexDirection: 'row',
+      width: '100%',
+      marginBottom: 24,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryStatItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    categoryStatDivider: {
+      width: 1,
+      backgroundColor: colors.border,
+    },
+    categoryStatLabel: {
+      fontSize: 12,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+    },
+    categoryStatValue: {
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    viewTransactionsButton: {
+      width: '100%',
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    viewTransactionsText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
 
     calendarSection: {
       backgroundColor: colors.cardBackground,
@@ -807,6 +922,88 @@ export default function HomeScreen() {
       fontSize: 11,
       color: colors.textSecondary,
       textTransform: 'uppercase',
+    },
+    goalItem: {
+      backgroundColor: colors.cardBackground,
+      padding: 15,
+      borderRadius: 12,
+      marginBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    goalLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    goalIcon: {
+      fontSize: 24,
+    },
+    goalInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    goalName: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 4,
+      color: colors.text,
+    },
+    goalProgress: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    goalRight: {
+      alignItems: 'flex-end',
+    },
+    goalPercentage: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    budgetItem: {
+      backgroundColor: colors.cardBackground,
+      padding: 15,
+      borderRadius: 12,
+      marginBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    budgetLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    budgetIcon: {
+      fontSize: 24,
+    },
+    budgetInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    budgetCategory: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 4,
+      color: colors.text,
+    },
+    budgetProgress: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    budgetRight: {
+      alignItems: 'flex-end',
+    },
+    budgetPercentage: {
+      fontSize: 16,
+      fontWeight: 'bold',
     },
 
     modalOverlay: {
@@ -1117,21 +1314,73 @@ export default function HomeScreen() {
 
         {/* Pie Chart - Expense Breakdown */}
         {selectedChartType === 'pie' && (
-          <PieChart
-            data={chartData}
-            width={screenWidth - 72}
-            height={220}
-            chartConfig={{
-              backgroundGradientFrom: colors.cardBackground,
-              backgroundGradientTo: colors.cardBackground,
-              color: (opacity = 1) => colors.text + Math.round(opacity * 255).toString(16),
-              strokeWidth: 2,
-            }}
-            accessor="amount"
-            backgroundColor="transparent"
-            paddingLeft="15"
-            absolute
-          />
+          <View>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                // Find the largest slice as default selection
+                const largestSlice = chartData[0];
+                if (largestSlice && largestSlice.fullName !== 'No Data') {
+                  setSelectedCategory({
+                    name: largestSlice.fullName,
+                    amount: largestSlice.amount,
+                    percentage: largestSlice.percentage,
+                  });
+                  setIsCategoryModalVisible(true);
+                }
+              }}
+            >
+              <PieChart
+                data={chartData}
+                width={screenWidth - 72}
+                height={220}
+                chartConfig={{
+                  backgroundGradientFrom: colors.cardBackground,
+                  backgroundGradientTo: colors.cardBackground,
+                  color: (opacity = 1) => colors.text + Math.round(opacity * 255).toString(16),
+                  strokeWidth: 2,
+                }}
+                accessor="amount"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                hasLegend={false}
+              />
+            </TouchableOpacity>
+            
+            {/* Custom Interactive Legend */}
+            <View style={styles.pieLegendContainer}>
+              {chartData.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.pieLegendItem,
+                    { backgroundColor: colors.cardBackground },
+                  ]}
+                  onPress={() => {
+                    if (item.fullName !== 'No Data') {
+                      setSelectedCategory({
+                        name: item.fullName,
+                        amount: item.amount,
+                        percentage: item.percentage,
+                      });
+                      setIsCategoryModalVisible(true);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.pieLegendColor, { backgroundColor: item.color }]} />
+                  <View style={styles.pieLegendTextContainer}>
+                    <Text style={[styles.pieLegendName, { color: colors.text }]} numberOfLines={1}>
+                      {item.fullName}
+                    </Text>
+                    <Text style={[styles.pieLegendAmount, { color: colors.textSecondary }]}>
+                      ${item.amount.toFixed(2)} ({item.percentage.toFixed(1)}%)
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         )}
 
         {/* Line Chart - 7-Day Spending Trend */}
@@ -1236,9 +1485,6 @@ export default function HomeScreen() {
 
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/add-transaction?returnTo=/(tabs)')}>
-          <Text style={styles.addButtonText}>+ Add</Text>
-        </TouchableOpacity>
       </View>
 
       {transactions.length === 0 ? (
@@ -1283,6 +1529,99 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Recent Goals Section */}
+      <View style={styles.headerRow}>
+        <Text style={styles.sectionTitle}>Recent Goals</Text>
+      </View>
+
+      {goals.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="flag-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+          <Text style={styles.emptyText}>No goals</Text>
+          <Text style={styles.emptySubtext}>Create your first savings goal!</Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/add-goal?returnTo=/(tabs)')}>
+            <Text style={styles.emptyButtonText}>Add Goal</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.listContent}>
+          {goals.map((item) => {
+            const percentage = Math.min((item.savedAmount / item.targetAmount) * 100, 100);
+            return (
+              <TouchableOpacity
+                key={item._id}
+                style={styles.goalItem}
+                onPress={() => router.push(`/(tabs)/edit-goal?id=${item._id}&returnTo=/(tabs)`)}
+              >
+                <View style={styles.goalLeft}>
+                  <View style={styles.iconContainer}>
+                    <Text style={styles.goalIcon}>{item.icon || '🎯'}</Text>
+                  </View>
+                  <View style={styles.goalInfo}>
+                    <Text style={styles.goalName}>{item.name}</Text>
+                    <Text style={styles.goalProgress}>
+                      ${item.savedAmount.toFixed(2)} / ${item.targetAmount.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.goalRight}>
+                  <Text style={[styles.goalPercentage, { color: percentage >= 100 ? colors.income : colors.primary }]}>
+                    {percentage.toFixed(0)}%
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Recent Budgets Section */}
+      <View style={styles.headerRow}>
+        <Text style={styles.sectionTitle}>Recent Budgets</Text>
+      </View>
+
+      {budgets.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="wallet-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+          <Text style={styles.emptyText}>No budgets</Text>
+          <Text style={styles.emptySubtext}>Create your first budget!</Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/add-budget?returnTo=/(tabs)')}>
+            <Text style={styles.emptyButtonText}>Add Budget</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.listContent}>
+          {budgets.map((item) => {
+            const percentage = Math.min((item.spentAmount / item.totalAmount) * 100, 100);
+            const progressColor = percentage >= 90 ? colors.danger : percentage >= 70 ? colors.warning : colors.income;
+            return (
+              <TouchableOpacity
+                key={item._id}
+                style={styles.budgetItem}
+                onPress={() => router.push(`/(tabs)/edit-budget?id=${item._id}&returnTo=/(tabs)`)}
+              >
+                <View style={styles.budgetLeft}>
+                  <View style={styles.iconContainer}>
+                    <Text style={styles.budgetIcon}>{item.icon || '💵'}</Text>
+                  </View>
+                  <View style={styles.budgetInfo}>
+                    <Text style={styles.budgetCategory}>{item.category}</Text>
+                    <Text style={styles.budgetProgress}>
+                      ${item.spentAmount.toFixed(2)} / ${item.totalAmount.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.budgetRight}>
+                  <Text style={[styles.budgetPercentage, { color: progressColor }]}>
+                    {percentage.toFixed(0)}%
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       {/* Allowance modal */}
       <Modal
         visible={isAllowanceModalVisible}
@@ -1296,11 +1635,30 @@ export default function HomeScreen() {
             <Text style={styles.modalSubtitle}>Set your monthly budget limit</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Enter amount"
+              placeholder="$0.00"
               placeholderTextColor={colors.textSecondary}
               keyboardType="decimal-pad"
               value={tempAllowance}
-              onChangeText={setTempAllowance}
+              onChangeText={(text) => {
+                // Remove non-numeric characters except decimal point
+                const cleaned = text.replace(/[^0-9.]/g, '');
+                // Ensure only one decimal point
+                const parts = cleaned.split('.');
+                let formatted = parts[0];
+                if (parts.length > 1) {
+                  formatted += '.' + parts.slice(1).join('').substring(0, 2);
+                }
+                // Cap at $1,000,000.00
+                const numValue = parseFloat(formatted) || 0;
+                if (numValue <= 1000000.00) {
+                  setTempAllowance(formatted);
+                } else {
+                  Alert.alert(
+                    'Maximum Limit Reached',
+                    'Monthly allowance cannot exceed $1,000,000.00'
+                  );
+                }
+              }}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -1420,6 +1778,61 @@ export default function HomeScreen() {
               <Ionicons name="add-circle-outline" size={24} color="#fff" />
               <Text style={styles.quickAddText}>Add Transaction for This Date</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Category Details Modal */}
+      <Modal
+        visible={isCategoryModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCategoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Category Details</Text>
+              <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {selectedCategory && (
+              <View style={styles.categoryModalBody}>
+                <View style={[styles.categoryModalIcon, { backgroundColor: chartData.find(c => c.fullName === selectedCategory.name)?.color + '20' }]}>
+                  <Text style={styles.categoryModalEmoji}>
+                    {getIconForCategory(selectedCategory.name)}
+                  </Text>
+                </View>
+                <Text style={[styles.categoryModalName, { color: colors.text }]}>
+                  {selectedCategory.name}
+                </Text>
+                <View style={styles.categoryModalStats}>
+                  <View style={styles.categoryStatItem}>
+                    <Text style={[styles.categoryStatLabel, { color: colors.textSecondary }]}>Amount</Text>
+                    <Text style={[styles.categoryStatValue, { color: colors.expense }]}>
+                      ${selectedCategory.amount.toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={styles.categoryStatDivider} />
+                  <View style={styles.categoryStatItem}>
+                    <Text style={[styles.categoryStatLabel, { color: colors.textSecondary }]}>Percentage</Text>
+                    <Text style={[styles.categoryStatValue, { color: colors.text }]}>
+                      {selectedCategory.percentage.toFixed(1)}%
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={[styles.viewTransactionsButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    setIsCategoryModalVisible(false);
+                    router.push('/(tabs)/transactions');
+                  }}
+                >
+                  <Text style={styles.viewTransactionsText}>View Transactions</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>

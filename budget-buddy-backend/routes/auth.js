@@ -18,6 +18,10 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
+    if (password.length > 32) {
+      return res.status(400).json({ error: 'Password must be at most 32 characters' });
+    }
+
     const existingUser = await User.findOne({ 
       $or: [{ email }, { username }] 
     });
@@ -213,6 +217,10 @@ router.post('/change-password', auth, async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
+    if (newPassword.length > 32) {
+      return res.status(400).json({ error: 'New password must be at most 32 characters' });
+    }
+
     // Find user and include password for verification
     const user = await User.findById(req.userId);
     if (!user) {
@@ -237,6 +245,151 @@ router.post('/change-password', auth, async (req, res) => {
   } catch (err) {
     console.error('Error changing password:', err);
     res.status(500).json({ error: 'Server error changing password' });
+  }
+});
+
+// DELETE /api/auth/delete-account
+router.delete('/delete-account', auth, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required to delete account' });
+    }
+
+    // Find user and verify password
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Incorrect password' });
+    }
+
+    // Delete user account
+    await User.findByIdAndDelete(req.userId);
+
+    res.json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting account:', err);
+    res.status(500).json({ error: 'Server error deleting account' });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { emailOrUsername } = req.body;
+
+    if (!emailOrUsername) {
+      return res.status(400).json({ error: 'Email or username is required' });
+    }
+
+    // Find user by email or username
+    const user = await User.findOne({
+      $or: [{ email: emailOrUsername }, { username: emailOrUsername }]
+    });
+
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return res.json({ 
+        message: 'If an account exists with that email or username, you will receive password reset instructions shortly.' 
+      });
+    }
+
+    // Generate reset token (simple random string, in production use crypto.randomBytes)
+    const resetToken = jwt.sign(
+      { userId: user._id, type: 'password-reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Save reset token and expiration (1 hour from now)
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+    await user.save();
+
+    // TODO: In production, send email with reset link
+    // For now, we'll return the token in the response (NOT recommended for production)
+    // In production, you would send an email with a link like:
+    // https://yourapp.com/reset-password?token=resetToken
+    
+    // Log token to console for demo purposes
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🔐 PASSWORD RESET TOKEN (DEMO MODE)');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`User: ${user.email} (${user.username})`);
+    console.log(`Reset Token: ${resetToken}`);
+    console.log(`Expires: ${user.resetPasswordExpires.toISOString()}`);
+    console.log('═══════════════════════════════════════════════════════');
+    
+    res.json({ 
+      message: 'Password reset token generated successfully.',
+      resetToken: resetToken, // Always return token for demo
+      expiresAt: user.resetPasswordExpires.toISOString()
+    });
+  } catch (err) {
+    console.error('Error in forgot password:', err);
+    res.status(500).json({ error: 'Server error processing password reset request' });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    if (newPassword.length > 32) {
+      return res.status(400).json({ error: 'New password must be at most 32 characters' });
+    }
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.type !== 'password-reset') {
+        return res.status(400).json({ error: 'Invalid reset token' });
+      }
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      _id: decoded.userId,
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password and clear reset token
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('Error resetting password:', err);
+    res.status(500).json({ error: 'Server error resetting password' });
   }
 });
 

@@ -23,6 +23,14 @@ const userSchema = new mongoose.Schema({
   monthlyAllowance: {
     type: Number,
     default: 1000
+  },
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true

@@ -20,7 +20,6 @@ import {
   type Transaction
 } from '../services/transactionService';
 
-const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
 const EXPENSE_CATEGORIES = [
   'Groceries',
   'Transport',
@@ -42,7 +41,7 @@ export default function TransactionsScreen() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
-  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
+  const [type, setType] = useState<'Expense'>('Expense');
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -72,27 +71,32 @@ export default function TransactionsScreen() {
     }
   };
 
-  const filterButtons = ['All', 'Income', 'Expense', 'Food', 'Rent'];
+  const filterButtons = ['All', 'Bills', 'Food', 'Rent', 'Groceries', 'Transport'];
+  
+  // Bills categories
+  const BILLS_CATEGORIES = ['Rent', 'Utilities', 'Phone', 'Internet', 'Insurance', 'Loan'];
 
-  const filteredTransactions = transactions.filter((t) => {
+  // Only show expense transactions (exclude income)
+  const expenseTransactions = transactions.filter((t) => t.type === 'Expense');
+
+  const filteredTransactions = expenseTransactions.filter((t) => {
     if (filter === 'All') return true;
-    if (filter === 'Income' || filter === 'Expense') return t.type === filter;
+    if (filter === 'Bills') return BILLS_CATEGORIES.includes(t.category);
     return t.category === filter;
   });
-
-  const totalIncome = transactions
-    .filter((t) => t.type === 'Income')
+  
+  // Calculate bills total
+  const billsTotal = expenseTransactions
+    .filter((t) => BILLS_CATEGORIES.includes(t.category))
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalExpense = Math.abs(
-    transactions
-      .filter((t) => t.type === 'Expense')
-      .reduce((sum, t) => sum + t.amount, 0)
+    expenseTransactions.reduce((sum, t) => sum + t.amount, 0)
   );
 
   const startEdit = (t: Transaction) => {
     setEditing(t);
-    setType(t.type);
+    setType('Expense'); // Only allow editing expense transactions
     setCategory(t.category);
     setAmount(t.amount.toString());
     setDescription(t.description || '');
@@ -174,7 +178,7 @@ export default function TransactionsScreen() {
     backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
     title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: colors.text },
     headerText: {
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: 'bold',
       color: colors.text,
     },
@@ -229,7 +233,7 @@ export default function TransactionsScreen() {
       fontSize: 10,
     },
     transactionRight: { alignItems: 'flex-end' },
-    transactionAmount: { fontSize: 18, fontWeight: 'bold', marginBottom: 2 },
+    transactionAmount: { fontSize: 16, fontWeight: 'bold', marginBottom: 2 },
     transactionDate: { fontSize: 12, color: colors.textSecondary },
     summaryFooter: {
       backgroundColor: colors.cardBackground,
@@ -240,7 +244,7 @@ export default function TransactionsScreen() {
       borderTopColor: colors.border,
     },
     summaryItem: { flex: 1, alignItems: 'center' },
-    summaryValue: { fontSize: 24, fontWeight: 'bold', color: colors.income },
+    summaryValue: { fontSize: 18, fontWeight: 'bold', color: colors.income },
     summaryLabel: { fontSize: 14, color: colors.textSecondary },
     summaryDivider: { width: 1, backgroundColor: colors.border, marginHorizontal: 20 },
     typeContainer: { flexDirection: 'row', padding: 20, gap: 12 },
@@ -262,7 +266,7 @@ export default function TransactionsScreen() {
       backgroundColor: colors.cardBackground,
       borderRadius: 10,
       padding: 16,
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: 'bold',
       textAlign: 'center',
       color: colors.text,
@@ -321,7 +325,7 @@ export default function TransactionsScreen() {
 
   // 🔹 If in edit mode
   if (editing) {
-    const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const categories = EXPENSE_CATEGORIES;
     return (
       <ScrollView style={styles.container}>
         <View style={styles.header}>
@@ -329,31 +333,6 @@ export default function TransactionsScreen() {
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Edit Transaction</Text>
-        </View>
-
-        <View style={styles.typeContainer}>
-          <TouchableOpacity
-            style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
-            onPress={() => {
-              setType('Income');
-              setCategory('');
-            }}
-          >
-            <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
-              Income
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
-            onPress={() => {
-              setType('Expense');
-              setCategory('');
-            }}
-          >
-            <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
-              Expense
-            </Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -496,10 +475,13 @@ export default function TransactionsScreen() {
               <Text
                 style={[
                   styles.transactionAmount,
-                  { color: item.type === 'Income' ? colors.income : colors.expense },
+                  { color: colors.expense },
                 ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
               >
-                {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
+                -${Math.abs(item.amount).toFixed(2)}
               </Text>
               <Text style={styles.transactionDate}>
                 {new Date(item.date).toLocaleDateString()}
@@ -511,15 +493,39 @@ export default function TransactionsScreen() {
 
       <View style={styles.summaryFooter}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>${totalIncome.toFixed(0)}</Text>
-          <Text style={styles.summaryLabel}>Income</Text>
+          <Text 
+            style={[styles.summaryValue, { color: colors.expense }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            ${totalExpense.toFixed(2)}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Expenses</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: colors.expense }]}>
-            ${totalExpense.toFixed(0)}
+          <Text 
+            style={[styles.summaryValue, { color: '#FF9800' }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            ${billsTotal.toFixed(2)}
           </Text>
-          <Text style={styles.summaryLabel}>Expenses</Text>
+          <Text style={styles.summaryLabel}>Bills</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text 
+            style={[styles.summaryValue, { color: '#4CAF50' }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            ${(totalExpense - billsTotal).toFixed(2)}
+          </Text>
+          <Text style={styles.summaryLabel}>Other Expenses</Text>
         </View>
       </View>
     </View>

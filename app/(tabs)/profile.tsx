@@ -19,10 +19,30 @@ import {
 import { BarChart, LineChart } from 'react-native-chart-kit';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { changePassword, getUserProfile, updateUserProfile } from '../services/authService';
+import { changePassword, deleteAccount, getUserProfile, updateUserProfile } from '../services/authService';
 import { getTransactionStats, getTransactions } from '../services/transactionService';
 
 const screenWidth = Dimensions.get('window').width;
+
+// Password validation helper
+const validatePassword = (password: string): { valid: boolean; message: string } => {
+  if (password.length < 6) {
+    return { valid: false, message: 'Password must be at least 6 characters' };
+  }
+  if (password.length > 32) {
+    return { valid: false, message: 'Password must be at most 32 characters' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)' };
+  }
+  return { valid: true, message: '' };
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -49,6 +69,9 @@ export default function ProfileScreen() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const fallbackAvatar = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
@@ -138,14 +161,34 @@ export default function ProfileScreen() {
       Alert.alert('Error', 'Username cannot be empty');
       return;
     }
+
+    if (profile.username.trim().length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters');
+      return;
+    }
+
+    if (profile.username.trim().length > 30) {
+      Alert.alert('Error', 'Username must be 30 characters or less');
+      return;
+    }
     
     if (!profile.email.trim() || !profile.email.includes('@')) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
+    if (profile.email.trim().length > 100) {
+      Alert.alert('Error', 'Email must be 100 characters or less');
+      return;
+    }
+
     if (profile.monthlyAllowance < 0) {
       Alert.alert('Error', 'Monthly allowance cannot be negative');
+      return;
+    }
+
+    if (profile.monthlyAllowance > 1000000) {
+      Alert.alert('Error', 'Monthly allowance cannot exceed $1,000,000.00');
       return;
     }
 
@@ -176,13 +219,15 @@ export default function ProfileScreen() {
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      Alert.alert('Error', 'New password must be at least 6 characters long');
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
       return;
     }
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+    // Validate password requirements
+    const passwordValidation = validatePassword(passwordData.newPassword);
+    if (!passwordValidation.valid) {
+      Alert.alert('Password Requirements', passwordValidation.message);
       return;
     }
 
@@ -198,6 +243,40 @@ export default function ProfileScreen() {
       Alert.alert('Error', errorMessage);
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  // Delete Account
+  const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) {
+      Alert.alert('Error', 'Please enter your password to confirm account deletion');
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      await deleteAccount(deletePassword);
+      setShowDeleteModal(false);
+      setDeletePassword('');
+      Alert.alert(
+        'Account Deleted',
+        'Your account has been permanently deleted.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              await logout();
+              router.replace('/(auth)/login');
+            }
+          }
+        ]
+      );
+    } catch (err: any) {
+      console.error('Error deleting account:', err);
+      const errorMessage = err.response?.data?.error || 'Unable to delete account.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -415,30 +494,78 @@ export default function ProfileScreen() {
       <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Edit Profile</Text>
 
-        <TextInput
-          style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-          placeholder="Username"
-          value={profile.username}
-          onChangeText={(text) => setProfile({ ...profile, username: text })}
-          editable={editing}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-          placeholder="Email"
-          value={profile.email}
-          onChangeText={(text) => setProfile({ ...profile, email: text })}
-          editable={editing}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-          placeholder="Monthly Allowance"
-          keyboardType="numeric"
-          value={String(profile.monthlyAllowance)}
-          onChangeText={(text) =>
-            setProfile({ ...profile, monthlyAllowance: parseFloat(text) || 0 })
-          }
-          editable={editing}
-        />
+        <View style={{ marginBottom: 16 }}>
+          <Text style={[styles.inputLabel, { color: colors.text }]}>Username</Text>
+          <TextInput
+            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+            placeholder="Username (3-30 characters)"
+            value={profile.username}
+            onChangeText={(text) => {
+              if (text.length <= 30) {
+                setProfile({ ...profile, username: text });
+                if (text.length === 30) {
+                  Alert.alert('Character Limit Reached', 'Username cannot exceed 30 characters');
+                }
+              } else {
+                Alert.alert('Username Too Long', 'Username must be 30 characters or less');
+              }
+            }}
+            editable={editing}
+            maxLength={30}
+          />
+        </View>
+        
+        <View style={{ marginBottom: 16 }}>
+          <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
+          <TextInput
+            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+            placeholder="Email (max 100 characters)"
+            value={profile.email}
+            onChangeText={(text) => {
+              if (text.length <= 100) {
+                setProfile({ ...profile, email: text });
+                if (text.length === 100) {
+                  Alert.alert('Character Limit Reached', 'Email cannot exceed 100 characters');
+                }
+              } else {
+                Alert.alert('Email Too Long', 'Email must be 100 characters or less');
+              }
+            }}
+            editable={editing}
+            maxLength={100}
+          />
+        </View>
+        
+        <View style={{ marginBottom: 16 }}>
+          <Text style={[styles.inputLabel, { color: colors.text }]}>Monthly Allowance</Text>
+          <TextInput
+            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+            placeholder="Enter monthly allowance ($)"
+            keyboardType="decimal-pad"
+            value={String(profile.monthlyAllowance)}
+            onChangeText={(text) => {
+              // Remove non-numeric characters except decimal point
+              const cleaned = text.replace(/[^0-9.]/g, '');
+              // Ensure only one decimal point
+              const parts = cleaned.split('.');
+              let formatted = parts[0];
+              if (parts.length > 1) {
+                formatted += '.' + parts.slice(1).join('').substring(0, 2);
+              }
+              // Cap at $1,000,000.00
+              const numValue = parseFloat(formatted) || 0;
+              if (numValue <= 1000000.00) {
+                setProfile({ ...profile, monthlyAllowance: numValue });
+              } else {
+                Alert.alert(
+                  'Maximum Limit Reached',
+                  'Monthly allowance cannot exceed $1,000,000.00'
+                );
+              }
+            }}
+            editable={editing}
+          />
+        </View>
 
         {editing ? (
           <View style={styles.buttonRow}>
@@ -503,7 +630,79 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={22} color={'red'} />
           <Text style={[styles.optionText, { color: 'red' }]}>Logout</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.option} onPress={() => setShowDeleteModal(true)}>
+          <Ionicons name="trash-outline" size={22} color={'red'} />
+          <Text style={[styles.optionText, { color: 'red' }]}>Delete Account</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* DELETE ACCOUNT MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showDeleteModal}
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Delete Account</Text>
+              <TouchableOpacity onPress={() => setShowDeleteModal(false)}>
+                <Ionicons name="close" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={[styles.inputLabel, { color: colors.text, fontSize: 16, marginBottom: 16 }]}>
+                ⚠️ Warning: This action cannot be undone!
+              </Text>
+              <Text style={[styles.tipsText, { color: colors.textSecondary, marginBottom: 20 }]}>
+                Deleting your account will permanently remove all your data including:
+                {'\n'}• Transactions
+                {'\n'}• Budgets
+                {'\n'}• Goals
+                {'\n'}• Subscriptions
+                {'\n'}• All other account data
+              </Text>
+
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Enter Password to Confirm</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                value={deletePassword}
+                onChangeText={setDeletePassword}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', padding: 20, gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setDeletePassword('');
+                }}
+                disabled={deletingAccount}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalDeleteButton, { backgroundColor: colors.expense }]}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalDeleteText}>Delete Account</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* PASSWORD CHANGE MODAL */}
       <Modal
@@ -535,30 +734,56 @@ export default function ProfileScreen() {
               <Text style={[styles.inputLabel, { color: colors.text }]}>New Password</Text>
               <TextInput
                 style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-                placeholder="Enter new password (min 6 characters)"
+                placeholder="Enter new password (6-32 chars, requires: A-Z, a-z, special)"
                 placeholderTextColor={colors.textSecondary}
                 secureTextEntry
                 value={passwordData.newPassword}
-                onChangeText={(text) => setPasswordData({ ...passwordData, newPassword: text })}
+                onChangeText={(text) => {
+                  if (text.length <= 32) {
+                    setPasswordData({ ...passwordData, newPassword: text });
+                    if (text.length === 32) {
+                      Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                    }
+                  } else {
+                    Alert.alert('Password Too Long', 'Password must be 32 characters or less');
+                  }
+                }}
+                maxLength={32}
               />
 
               <Text style={[styles.inputLabel, { color: colors.text }]}>Confirm New Password</Text>
               <TextInput
                 style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-                placeholder="Re-enter new password"
+                placeholder="Re-enter new password (max 32 characters)"
                 placeholderTextColor={colors.textSecondary}
                 secureTextEntry
                 value={passwordData.confirmPassword}
-                onChangeText={(text) => setPasswordData({ ...passwordData, confirmPassword: text })}
+                onChangeText={(text) => {
+                  if (text.length <= 32) {
+                    setPasswordData({ ...passwordData, confirmPassword: text });
+                    if (text.length === 32) {
+                      Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                    }
+                  } else {
+                    Alert.alert('Password Too Long', 'Password must be 32 characters or less');
+                  }
+                }}
+                maxLength={32}
               />
 
               <View style={styles.passwordTips}>
                 <Text style={[styles.tipsTitle, { color: colors.text }]}>Password Requirements:</Text>
                 <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
-                  • At least 6 characters long
+                  • Between 6-32 characters long
                 </Text>
                 <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
-                  • Use a mix of letters, numbers, and symbols
+                  • At least one lowercase letter (a-z)
+                </Text>
+                <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
+                  • At least one uppercase letter (A-Z)
+                </Text>
+                <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
+                  • At least one special character 
                 </Text>
               </View>
             </View>
@@ -746,5 +971,29 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  modalDeleteButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalDeleteText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 });

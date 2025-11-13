@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,8 +13,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { signup as apiSignup } from '../services/authService';
+import { resetPassword } from '../services/authService';
 
 // Password validation helper
 const validatePassword = (password: string): { valid: boolean; message: string } => {
@@ -36,54 +35,57 @@ const validatePassword = (password: string): { valid: boolean; message: string }
   return { valid: true, message: '' };
 };
 
-export default function SignUpScreen() {
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+export default function ResetPasswordScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const tokenFromUrl = params.token as string;
+  
+  const [token, setToken] = useState(tokenFromUrl || '');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const { login } = useAuth();
 
-  const handleSignUp = async () => {
-    if (!email.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const handleResetPassword = async () => {
+    if (!token.trim()) {
+      Alert.alert('Error', 'Please enter the reset token');
       return;
     }
 
-    if (username.trim().length < 3) {
-      Alert.alert('Error', 'Username must be at least 3 characters');
+    if (!newPassword.trim() || !confirmPassword.trim()) {
+      Alert.alert('Error', 'Please fill in all password fields');
       return;
     }
-    
-    if (password !== confirmPassword) {
+
+    if (newPassword !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
     // Validate password requirements
-    const passwordValidation = validatePassword(password);
+    const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
       Alert.alert('Password Requirements', passwordValidation.message);
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
     setLoading(true);
     try {
-      const response = await apiSignup(username.trim(), email.trim(), password);
-      await login(response.user, response.token);
-      Alert.alert('Success', 'Account created successfully!');
-      router.replace('/(tabs)');
+      await resetPassword(token.trim(), newPassword);
+      
+      Alert.alert(
+        '✅ Password Reset Successful',
+        'Your password has been reset successfully. You can now login with your new password.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => router.replace('/(auth)/login')
+          }
+        ]
+      );
     } catch (error: any) {
-      console.error('Signup error:', error);
-      const errorMessage = error.response?.data?.error || 'Signup failed. Please try again.';
-      Alert.alert('Signup Failed', errorMessage);
+      console.error('Password reset error:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to reset password. Please check your token and try again.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -107,65 +109,33 @@ export default function SignUpScreen() {
           <View style={styles.formContainer}>
             <View style={styles.logoContainer}>
               <View style={styles.logoCircle}>
-                <Text style={styles.logoEmoji}>💰</Text>
+                <Text style={styles.logoEmoji}>🔑</Text>
               </View>
-              <Text style={styles.appTitle}>Create Account</Text>
-              <Text style={styles.subtitle}>Join Budget Buddy today</Text>
+              <Text style={styles.appTitle}>Reset Password</Text>
+              <Text style={styles.subtitle}>Enter your reset token and new password</Text>
             </View>
 
             <View style={styles.inputSection}>
               <View style={styles.inputContainer}>
                 <TextInput
-                  placeholder="Email (max 100 characters)"
-                  value={email}
-                  onChangeText={(text) => {
-                    if (text.length <= 100) {
-                      setEmail(text);
-                      if (text.length === 100) {
-                        Alert.alert('Character Limit Reached', 'Email cannot exceed 100 characters');
-                      }
-                    } else {
-                      Alert.alert('Email Too Long', 'Email must be 100 characters or less');
-                    }
-                  }}
+                  placeholder="Reset Token"
+                  value={token}
+                  onChangeText={setToken}
                   style={styles.input}
                   placeholderTextColor="#999"
                   autoCapitalize="none"
-                  keyboardType="email-address"
+                  autoCorrect={false}
                   editable={!loading}
-                  maxLength={100}
                 />
               </View>
 
               <View style={styles.inputContainer}>
                 <TextInput
-                  placeholder="Username (3-30 characters)"
-                  value={username}
-                  onChangeText={(text) => {
-                    if (text.length <= 30) {
-                      setUsername(text);
-                      if (text.length === 30) {
-                        Alert.alert('Character Limit Reached', 'Username cannot exceed 30 characters');
-                      }
-                    } else {
-                      Alert.alert('Username Too Long', 'Username must be 30 characters or less');
-                    }
-                  }}
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  autoCapitalize="none"
-                  editable={!loading}
-                  maxLength={30}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Password (6-32 chars, requires: A-Z, a-z, special)"
-                  value={password}
+                  placeholder="New Password (6-32 chars, requires: A-Z, a-z, special)"
+                  value={newPassword}
                   onChangeText={(text) => {
                     if (text.length <= 32) {
-                      setPassword(text);
+                      setNewPassword(text);
                       if (text.length === 32) {
                         Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
                       }
@@ -183,7 +153,7 @@ export default function SignUpScreen() {
 
               <View style={styles.inputContainer}>
                 <TextInput
-                  placeholder="Confirm Password (max 32 characters)"
+                  placeholder="Confirm New Password"
                   value={confirmPassword}
                   onChangeText={(text) => {
                     if (text.length <= 32) {
@@ -203,23 +173,30 @@ export default function SignUpScreen() {
                 />
               </View>
 
+              <View style={styles.passwordTips}>
+                <Text style={styles.tipsTitle}>Password Requirements:</Text>
+                <Text style={styles.tipsText}>• Between 6-32 characters long</Text>
+                <Text style={styles.tipsText}>• At least one lowercase letter (a-z)</Text>
+                <Text style={styles.tipsText}>• At least one uppercase letter (A-Z)</Text>
+                <Text style={styles.tipsText}>• At least one special character </Text>
+              </View>
+
               <TouchableOpacity 
-                style={[styles.signupButton, loading && styles.signupButtonDisabled]} 
-                onPress={handleSignUp}
+                style={[styles.resetButton, loading && styles.resetButtonDisabled]} 
+                onPress={handleResetPassword}
                 activeOpacity={0.8}
                 disabled={loading}
               >
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={styles.signupButtonText}>Sign Up</Text>
+                  <Text style={styles.resetButtonText}>Reset Password</Text>
                 )}
               </TouchableOpacity>
 
-              <View style={styles.loginContainer}>
-                <Text style={styles.loginText}>Already have an account? </Text>
+              <View style={styles.backContainer}>
                 <TouchableOpacity onPress={() => router.back()}>
-                  <Text style={styles.loginLink}>Login</Text>
+                  <Text style={styles.backLink}>← Back</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -283,6 +260,8 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
   },
   inputSection: {
     width: '100%',
@@ -298,7 +277,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  signupButton: {
+  passwordTips: {
+    marginTop: 8,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 8,
+  },
+  tipsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
+  tipsText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  resetButton: {
     backgroundColor: '#66BB6A',
     borderRadius: 12,
     padding: 18,
@@ -310,25 +307,21 @@ const styles = StyleSheet.create({
     elevation: 5,
     marginTop: 8,
   },
-  signupButtonDisabled: {
+  resetButtonDisabled: {
     opacity: 0.7,
   },
-  signupButtonText: {
+  resetButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-  loginContainer: {
+  backContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 24,
   },
-  loginText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  loginLink: {
+  backLink: {
     color: '#2196F3',
     fontSize: 14,
     fontWeight: '600',

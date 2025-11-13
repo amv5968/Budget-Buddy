@@ -14,7 +14,6 @@ import {
 import { maybeTriggerThresholdAlerts, notifyNewTransaction } from '../services/notificationService';
 import { addTransaction, createRecurringTransaction } from '../services/transactionService';
 
-const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Business', 'Other'];
 const EXPENSE_CATEGORIES = [
   'Groceries',
   'Transport',
@@ -25,6 +24,10 @@ const EXPENSE_CATEGORIES = [
   'Education',
   'Utilities',
   'Rent',
+  'Phone',
+  'Internet',
+  'Insurance',
+  'Loan',
   'Other',
 ];
 
@@ -39,7 +42,7 @@ export default function AddTransactionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const returnTo = (params.returnTo as string) || '/(tabs)';
-  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
+  const type = 'Expense'; // Always Expense - income removed
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -50,7 +53,7 @@ export default function AddTransactionScreen() {
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [endDate, setEndDate] = useState('');
 
-  const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const categories = EXPENSE_CATEGORIES;
 
   const handleSubmit = async () => {
     if (!category) {
@@ -121,38 +124,27 @@ export default function AddTransactionScreen() {
         <Text style={styles.title}>Add Transaction</Text>
       </View>
 
-      <View style={styles.typeContainer}>
-        <TouchableOpacity
-          style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
-          onPress={() => {
-            setType('Income');
-            setCategory('');
-          }}
-        >
-          <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
-            Income
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
-          onPress={() => {
-            setType('Expense');
-            setCategory('');
-          }}
-        >
-          <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
-            Expense
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.label}>Amount</Text>
         <TextInput
           style={styles.amountInput}
-          placeholder="0.00"
+          placeholder="$0.00"
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={(text) => {
+            // Remove non-numeric characters except decimal point
+            const cleaned = text.replace(/[^0-9.]/g, '');
+            // Ensure only one decimal point
+            const parts = cleaned.split('.');
+            let formatted = parts[0];
+            if (parts.length > 1) {
+              formatted += '.' + parts.slice(1).join('').substring(0, 2);
+            }
+            // Cap at $999,999,999.99
+            const numValue = parseFloat(formatted) || 0;
+            if (numValue <= 999999999.99) {
+              setAmount(formatted);
+            }
+          }}
           keyboardType="decimal-pad"
           placeholderTextColor="#999"
         />
@@ -291,32 +283,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-  },
-  typeContainer: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-  },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-  },
-  typeButtonActive: {
-    backgroundColor: '#66BB6A',
-    borderColor: '#66BB6A',
-  },
-  typeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  typeTextActive: {
-    color: 'white',
   },
   section: {
     paddingHorizontal: 20,

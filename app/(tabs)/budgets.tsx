@@ -183,6 +183,10 @@ export default function BudgetsScreen() {
       color: colors.textSecondary,
       textAlign: 'right',
     },
+    budgetTypeBadge: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
   });
 
   if (loading) {
@@ -237,7 +241,14 @@ export default function BudgetsScreen() {
                   <View style={styles.budgetInfo}>
                     <Text style={styles.budgetIcon}>{item.icon || '💵'}</Text>
                     <View>
-                      <Text style={styles.budgetCategory}>{item.category}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={styles.budgetCategory}>{item.category}</Text>
+                        {item.type === 'Income' && (
+                          <Text style={[styles.budgetTypeBadge, { color: colors.income }]}>
+                            💰 Income
+                          </Text>
+                        )}
+                      </View>
                       <Text style={styles.budgetAmount}>
                         ${item.spentAmount.toFixed(2)} / ${item.totalAmount.toFixed(2)}
                       </Text>

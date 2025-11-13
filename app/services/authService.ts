@@ -17,7 +17,7 @@ export interface UserProfile {
   monthlyAllowance: number;
 }
 
-// 🧩 SIGNUP
+// SIGNUP
 export const signup = async (
   username: string,
   email: string,
@@ -31,7 +31,7 @@ export const signup = async (
   return response.data;
 };
 
-// 🔐 LOGIN
+// OGIN
 export const login = async (
   emailOrUsername: string,
   password: string
@@ -43,13 +43,13 @@ export const login = async (
   return response.data;
 };
 
-// 👤 GET USER PROFILE
+// GET USER PROFILE
 export const getUserProfile = async (): Promise<UserProfile> => {
   const response = await api.get('/auth/profile');
   return response.data;
 };
 
-// 💰 UPDATE MONTHLY ALLOWANCE
+// UPDATE MONTHLY ALLOWANCE
 export const updateMonthlyAllowance = async (
   monthlyAllowance: number
 ): Promise<UserProfile> => {
@@ -59,7 +59,7 @@ export const updateMonthlyAllowance = async (
   return response.data;
 };
 
-// 🧾 UPDATE USER PROFILE (NEW)
+// UPDATE USER PROFILE (NEW)
 export const updateUserProfile = async (
   profileData: {
     username?: string;
@@ -90,6 +90,46 @@ export const changePassword = async (
     return response.data;
   } catch (error: any) {
     console.error('[changePassword] error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// DELETE ACCOUNT
+export const deleteAccount = async (password: string): Promise<{ message: string }> => {
+  try {
+    const response = await api.delete('/auth/delete-account', {
+      data: { password },
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('[deleteAccount] error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// FORGOT PASSWORD
+export const forgotPassword = async (emailOrUsername: string): Promise<{ message: string; resetToken?: string; expiresAt?: string }> => {
+  try {
+    const response = await api.post('/auth/forgot-password', {
+      emailOrUsername,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('[forgotPassword] error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// RESET PASSWORD
+export const resetPassword = async (token: string, newPassword: string): Promise<{ message: string }> => {
+  try {
+    const response = await api.post('/auth/reset-password', {
+      token,
+      newPassword,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('[resetPassword] error:', error.response?.data || error.message);
     throw error;
   }
 };
