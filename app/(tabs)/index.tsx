@@ -62,9 +62,9 @@ export default function HomeScreen() {
   const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
 
   // --- allowance state ---
-  const [monthlyAllowance, setMonthlyAllowance] = useState(1000);
+  const [monthlyAllowance, setMonthlyAllowance] = useState(0);
   const [isAllowanceModalVisible, setIsAllowanceModalVisible] = useState(false);
-  const [tempAllowance, setTempAllowance] = useState('1000');
+  const [tempAllowance, setTempAllowance] = useState('0');
 
   // --- sidebar ---
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
@@ -152,7 +152,7 @@ export default function HomeScreen() {
   const loadAllowance = async () => {
     try {
       const profile = await getUserProfile();
-      const dbAllowance = profile.monthlyAllowance ?? 1000;
+      const dbAllowance = profile.monthlyAllowance ?? 0;
       setMonthlyAllowance(dbAllowance);
       setTempAllowance(dbAllowance.toString());
     } catch (error) {
@@ -162,8 +162,8 @@ export default function HomeScreen() {
         'Unable to load allowance from server. Please check your backend connection.',
         [{ text: 'OK' }]
       );
-      setMonthlyAllowance(1000);
-      setTempAllowance('1000');
+      setMonthlyAllowance(0);
+      setTempAllowance('0');
     }
   };
 
@@ -173,6 +173,10 @@ export default function HomeScreen() {
       const amount = parseFloat(tempAllowance);
       if (isNaN(amount) || amount <= 0) {
         Alert.alert('Invalid Amount', 'Please enter a valid amount');
+        return;
+      }
+      else if (amount > totalIncome) {
+        Alert.alert('Allowance cannot be higher than your income', 'Please enter a valid amount');
         return;
       }
 
