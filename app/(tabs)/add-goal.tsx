@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { addGoal, deleteGoal } from '../services/goalService';
 
 interface Goal {
@@ -37,7 +37,9 @@ const GOAL_ICONS = [
 
 export default function AddGoalScreen() {
   const router = useRouter();
-  const { goal } = useLocalSearchParams<{ goal?: string }>();
+  const params = useLocalSearchParams<{ goal?: string; returnTo?: string }>();
+  const { goal } = params;
+  const returnTo = (params.returnTo as string) || '/(tabs)/goals';
 
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
@@ -87,7 +89,6 @@ export default function AddGoalScreen() {
       const errorMessage = error.response?.data?.error || 'Failed to create goal';
       Alert.alert('Error', errorMessage);
     } finally {
-
       setLoading(false);
     }
   };
@@ -117,10 +118,14 @@ export default function AddGoalScreen() {
     ]);
   };
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backText}>{'\u{2190}'} Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{isEditing ? 'Edit Savings Goal' : 'Create Savings Goal'}</Text>

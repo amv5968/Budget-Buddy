@@ -6,6 +6,12 @@ const budgetSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  type: {
+    type: String,
+    enum: ['Income', 'Expense'],
+    default: 'Expense',
+    required: true
+  },
   category: {
     type: String,
     required: true

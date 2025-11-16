@@ -1,149 +1,195 @@
 const express = require('express');
-const router = express.Router();
 const mongoose = require('mongoose');
-const auth = require('../middleware/auth');
 const Transaction = require('../models/Transaction');
+const auth = require('../middleware/auth');
+const {
+  processRecurringTransactions,
+  processSubscriptions,
+  createRecurringTransaction,
+  stopRecurringTransaction,
+  getActiveRecurringTransactions
+} = require('../services/recurringTransactionService');
 
-// Helper: normalize the user id and create a filter that matches both string and ObjectId
-function getUserIdFilters(req) {
-  const raw = req.userId || req.user?.id || req.user?._id || req.user;
-  if (!raw) return null;
-
-  const oid = mongoose.Types.ObjectId.isValid(raw)
-    ? new mongoose.Types.ObjectId(raw)
-    : null;
-
-  // Match either string or ObjectId — whichever your schema stores
-  return { $in: [String(raw), oid].filter(Boolean) };
-}
-
-// Helper: case-insensitive match for type
-const typeIn = (t) => ({ $in: [t, t.toUpperCase(), t.toLowerCase()] });
-
-//Create
+const router = express.Router();
 
 router.post('/', auth, async (req, res) => {
   try {
-    const userIdFilter = getUserIdFilters(req);
-    if (!userIdFilter) return res.status(401).json({ error: 'Unauthorized' });
-
     const { type, category, amount, description, date } = req.body;
+
+    console.log('Creating transaction:', { type, category, amount, userId: req.userId });
+
     if (!type || !category || amount === undefined) {
       return res.status(400).json({ error: 'Required fields missing' });
     }
 
-    // Prefer storing the raw string id if that’s what your schema uses.
-    const rawUserId = String(req.userId || req.user?.id || req.user?._id || req.user);
-
-    const tx = new Transaction({
-      userId: rawUserId,
+    const transaction = new Transaction({
+      userId: req.userId,
       type,
       category,
-      amount: Number(amount),
+      amount,
       description: description || '',
-      date: date ? new Date(date) : new Date(),
+      date: date || new Date()
     });
 
-    await tx.save();
-    res.status(201).json(tx);
-  } catch (err) {
-    console.error('Transaction creation error:', err);
+    await transaction.save();
+    console.log('Transaction saved:', transaction);
+    res.status(201).json(transaction);
+  } catch (error) {
+    console.error('Transaction creation error:', error);
     res.status(500).json({ error: 'Server error creating transaction' });
   }
 });
 
-//List
 router.get('/', auth, async (req, res) => {
   try {
-    const userIdFilter = getUserIdFilters(req);
-    if (!userIdFilter) return res.status(401).json({ error: 'Unauthorized' });
-
-    const transactions = await Transaction.find({ userId: userIdFilter })
+    const transactions = await Transaction.find({ userId: req.userId })
       .sort({ date: -1, createdAt: -1 });
-
+    
     res.json(transactions);
-  } catch (err) {
-    console.error('Fetch transactions error:', err);
+  } catch (error) {
+    console.error('Fetch transactions error:', error);
     res.status(500).json({ error: 'Server error fetching transactions' });
   }
 });
 
-
- //Stats (totals)
- 
 router.get('/stats', auth, async (req, res) => {
   try {
-    const userIdFilter = getUserIdFilters(req);
-    if (!userIdFilter) return res.status(401).json({ error: 'Unauthorized' });
+    console.log('Fetching stats for userId:', req.userId);
+    
+    const allTransactions = await Transaction.find({ userId: req.userId });
+    console.log('Total transactions found:', allTransactions.length);
+    
+    let totalIncome = 0;
+    let totalExpense = 0;
+    
+    allTransactions.forEach(transaction => {
+      console.log(`Transaction: ${transaction.type} - $${transaction.amount}`);
+      if (transaction.type === 'Income') {
+        totalIncome += transaction.amount;
+      } else if (transaction.type === 'Expense') {
+        totalExpense += Math.abs(transaction.amount);
+      }
+    });
 
-    const [incomeAgg] = await Transaction.aggregate([
-      { $match: { userId: userIdFilter, type: typeIn('Income') } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
-    const [expenseAgg] = await Transaction.aggregate([
-      { $match: { userId: userIdFilter, type: typeIn('Expense') } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
-    const totalIncome = incomeAgg?.total || 0;
-    const totalExpense = expenseAgg?.total || 0;
+    console.log('💰 Total Income:', totalIncome);
+    console.log('💸 Total Expense:', totalExpense);
 
     res.json({
       totalIncome,
       totalExpense,
-      balance: totalIncome - totalExpense,
+      balance: totalIncome - totalExpense
     });
-  } catch (err) {
-    console.error('Stats error:', err);
+  } catch (error) {
+    console.error('Stats error:', error);
     res.status(500).json({ error: 'Server error fetching stats' });
   }
 });
 
-//Update
 router.put('/:id', auth, async (req, res) => {
   try {
-    const userIdFilter = getUserIdFilters(req);
-    if (!userIdFilter) return res.status(401).json({ error: 'Unauthorized' });
-
     const { type, category, amount, description, date } = req.body;
 
-    const updated = await Transaction.findOneAndUpdate(
-      { _id: req.params.id, userId: userIdFilter },
-      {
-        ...(type ? { type } : {}),
-        ...(category ? { category } : {}),
-        ...(amount !== undefined ? { amount: Number(amount) } : {}),
-        ...(description !== undefined ? { description } : {}),
-        ...(date ? { date: new Date(date) } : {}),
-      },
+    const transaction = await Transaction.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { type, category, amount, description, date },
       { new: true, runValidators: true }
     );
 
-    if (!updated) return res.status(404).json({ error: 'Transaction not found' });
-    res.json(updated);
-  } catch (err) {
-    console.error('Update transaction error:', err);
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    res.json(transaction);
+  } catch (error) {
+    console.error('Update transaction error:', error);
     res.status(500).json({ error: 'Server error updating transaction' });
   }
 });
 
-// Delete
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const userIdFilter = getUserIdFilters(req);
-    if (!userIdFilter) return res.status(401).json({ error: 'Unauthorized' });
-
-    const deleted = await Transaction.findOneAndDelete({
+    const transaction = await Transaction.findOneAndDelete({
       _id: req.params.id,
-      userId: userIdFilter,
+      userId: req.userId
     });
 
-    if (!deleted) return res.status(404).json({ error: 'Transaction not found' });
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
     res.json({ message: 'Transaction deleted successfully' });
-  } catch (err) {
-    console.error('Delete transaction error:', err);
+  } catch (error) {
+    console.error('Delete transaction error:', error);
     res.status(500).json({ error: 'Server error deleting transaction' });
+  }
+});
+
+router.get('/recurring', auth, async (req, res) => {
+  try {
+    const recurringTransactions = await getActiveRecurringTransactions(req.userId);
+    res.json(recurringTransactions);
+  } catch (error) {
+    console.error('Get recurring transactions error:', error);
+    res.status(500).json({ error: 'Server error fetching recurring transactions' });
+  }
+});
+
+router.post('/recurring', auth, async (req, res) => {
+  try {
+    const { type, category, amount, description, frequency, startDate, endDate } = req.body;
+
+    if (!type || !category || !amount || !frequency) {
+      return res.status(400).json({ error: 'Required fields missing' });
+    }
+
+    if (!['daily', 'weekly', 'monthly', 'yearly'].includes(frequency)) {
+      return res.status(400).json({ error: 'Invalid frequency' });
+    }
+
+    const result = await createRecurringTransaction(req.userId, {
+      type,
+      category,
+      amount,
+      description: description || '',
+      frequency,
+      startDate,
+      endDate
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Create recurring transaction error:', error);
+    res.status(500).json({ error: 'Server error creating recurring transaction' });
+  }
+});
+
+router.post('/recurring/:id/stop', auth, async (req, res) => {
+  try {
+    const transaction = await stopRecurringTransaction(req.params.id, req.userId);
+    res.json({ message: 'Recurring transaction stopped', transaction });
+  } catch (error) {
+    console.error('Stop recurring transaction error:', error);
+    res.status(500).json({ error: error.message || 'Server error stopping recurring transaction' });
+  }
+});
+
+router.post('/recurring/process', auth, async (req, res) => {
+  try {
+    const results = await processRecurringTransactions();
+    res.json(results);
+  } catch (error) {
+    console.error('Process recurring transactions error:', error);
+    res.status(500).json({ error: 'Server error processing recurring transactions' });
+  }
+});
+
+router.post('/subscriptions/process', auth, async (req, res) => {
+  try {
+    const results = await processSubscriptions();
+    res.json(results);
+  } catch (error) {
+    console.error('Process subscriptions error:', error);
+    res.status(500).json({ error: 'Server error processing subscriptions' });
   }
 });
 

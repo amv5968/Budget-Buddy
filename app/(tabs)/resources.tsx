@@ -1,14 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
+  Alert,
   Linking,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 
 interface Resource {
@@ -29,9 +29,200 @@ const ResourcesScreen: React.FC = () => {
   const { colors } = useTheme();
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
-  const categories = ['All', 'Financial Aid', 'Student Jobs', 'Budgeting Tools', 'Campus Resources', 'Learning'];
+  const categories = ['All', 'Taxes', 'Scholarships', 'Student Loans', 'Money Management', 'Financial Aid', 'Student Jobs', 'Budgeting Tools', 'Campus Resources', 'Learning'];
 
   const resources: Resource[] = [
+    // TAXES FOR STUDENTS
+    {
+      category: 'Taxes',
+      title: 'IRS Free File - Student Edition',
+      url: 'https://www.irs.gov/filing/free-file-do-your-federal-taxes-for-free',
+      desc: 'File your federal taxes for FREE if you earn under $73,000. Perfect for students with part-time jobs.',
+      icon: '📄',
+    },
+    {
+      category: 'Taxes',
+      title: 'Student Tax Guide - IRS Publication 970',
+      url: 'https://www.irs.gov/forms-pubs/about-publication-970',
+      desc: 'Official IRS guide on tax benefits for education, including credits, deductions, and savings plans.',
+      icon: '📖',
+    },
+    {
+      category: 'Taxes',
+      title: 'American Opportunity Tax Credit',
+      url: 'https://www.irs.gov/credits-deductions/individuals/aotc',
+      desc: 'Get up to $2,500 tax credit per year for tuition, fees, and course materials. Learn if you qualify.',
+      icon: '💵',
+    },
+    {
+      category: 'Taxes',
+      title: 'TurboTax Student Edition',
+      url: 'https://turbotax.intuit.com/personal-taxes/online/student-edition.jsp',
+      desc: 'Student-friendly tax filing with education credit guidance. Free for simple returns.',
+      icon: '🧾',
+    },
+    {
+      category: 'Taxes',
+      title: 'Understanding Your 1098-T Form',
+      url: 'https://www.irs.gov/forms-pubs/about-form-1098-t',
+      desc: 'Learn how to use your tuition statement form for tax benefits and education credits.',
+      icon: '📋',
+    },
+    
+    // SCHOLARSHIPS
+    {
+      category: 'Scholarships',
+      title: 'Fastweb Scholarship Search',
+      url: 'https://www.fastweb.com/',
+      desc: 'Free scholarship database with $3.4 billion+ available. Get matched with scholarships based on your profile.',
+      icon: '🎓',
+    },
+    {
+      category: 'Scholarships',
+      title: 'Penn State Scholarships',
+      url: 'https://admissions.psu.edu/costs-aid/scholarships/',
+      desc: 'Browse Penn State-specific scholarships, eligibility requirements, and application deadlines.',
+      icon: '🦁',
+    },
+    {
+      category: 'Scholarships',
+      title: 'Scholarships.com',
+      url: 'https://www.scholarships.com/',
+      desc: 'Free scholarship matching service with $19 billion in scholarships and grants.',
+      icon: '💰',
+    },
+    {
+      category: 'Scholarships',
+      title: 'Chegg Scholarships',
+      url: 'https://www.chegg.com/scholarships',
+      desc: 'No essay scholarships, easy application process, and monthly $1,000 giveaways.',
+      icon: '🎯',
+    },
+    {
+      category: 'Scholarships',
+      title: 'Federal Pell Grant Info',
+      url: 'https://studentaid.gov/understand-aid/types/grants/pell',
+      desc: 'Learn about federal grants that don\'t need to be repaid. Up to $7,395 per year for eligible students.',
+      icon: '🇺🇸',
+    },
+    {
+      category: 'Scholarships',
+      title: 'Scholarship Scam Alerts',
+      url: 'https://studentaid.gov/articles/scholarship-scams/',
+      desc: 'Protect yourself from scholarship scams. Learn warning signs and how to verify legitimate opportunities.',
+      icon: '⚠️',
+    },
+    
+    // STUDENT LOANS
+    {
+      category: 'Student Loans',
+      title: 'Federal Student Aid Loan Simulator',
+      url: 'https://studentaid.gov/loan-simulator/',
+      desc: 'Calculate monthly payments and compare repayment plans. See how much you\'ll pay over time.',
+      icon: '🧮',
+    },
+    {
+      category: 'Student Loans',
+      title: 'Understanding Student Loan Interest',
+      url: 'https://studentaid.gov/understand-aid/types/loans/interest-rates',
+      desc: 'Learn how interest works on federal loans, current rates, and how to minimize interest costs.',
+      icon: '📊',
+    },
+    {
+      category: 'Student Loans',
+      title: 'Income-Driven Repayment Plans',
+      url: 'https://studentaid.gov/manage-loans/repayment/plans/income-driven',
+      desc: 'Pay based on your income and family size. Payments as low as $0/month if you qualify.',
+      icon: '💳',
+    },
+    {
+      category: 'Student Loans',
+      title: 'Public Service Loan Forgiveness',
+      url: 'https://studentaid.gov/manage-loans/forgiveness-cancellation/public-service',
+      desc: 'Get federal loans forgiven after 10 years working in public service jobs (teaching, nursing, government).',
+      icon: '🏛️',
+    },
+    {
+      category: 'Student Loans',
+      title: 'Student Loan Deferment & Forbearance',
+      url: 'https://studentaid.gov/manage-loans/lower-payments/get-temporary-relief',
+      desc: 'Temporarily pause payments during hardship. Learn the difference and how to apply.',
+      icon: '⏸️',
+    },
+    {
+      category: 'Student Loans',
+      title: 'Avoiding Student Loan Default',
+      url: 'https://studentaid.gov/manage-loans/default',
+      desc: 'Critical info on default consequences and how to get back on track if struggling with payments.',
+      icon: '🚨',
+    },
+    {
+      category: 'Student Loans',
+      title: 'Student Loan Refinancing Guide',
+      url: 'https://www.consumerfinance.gov/ask-cfpb/what-is-student-loan-refinancing-en-2103/',
+      desc: 'Learn about refinancing private loans, when it makes sense, and potential risks.',
+      icon: '🔄',
+    },
+    
+    // MONEY MANAGEMENT
+    {
+      category: 'Money Management',
+      title: 'MyMoney.gov - Financial Education',
+      url: 'https://www.mymoney.gov/',
+      desc: 'U.S. government\'s free financial literacy resource. Learn budgeting, saving, credit, and investing basics.',
+      icon: '🏛️',
+    },
+    {
+      category: 'Money Management',
+      title: 'Consumer Financial Protection Bureau',
+      url: 'https://www.consumerfinance.gov/consumer-tools/money-as-you-grow/',
+      desc: 'Age-appropriate financial lessons and money management skills for students.',
+      icon: '🛡️',
+    },
+    {
+      category: 'Money Management',
+      title: 'Building Credit as a Student',
+      url: 'https://www.consumerfinance.gov/consumer-tools/credit-reports-and-scores/',
+      desc: 'Learn how credit works, how to build good credit, and why it matters for your future.',
+      icon: '📈',
+    },
+    {
+      category: 'Money Management',
+      title: 'Student Banking Guide',
+      url: 'https://www.consumerfinance.gov/consumer-tools/bank-accounts/',
+      desc: 'Choose the right bank account, avoid fees, and understand banking basics.',
+      icon: '🏦',
+    },
+    {
+      category: 'Money Management',
+      title: 'Emergency Fund Calculator',
+      url: 'https://www.nerdwallet.com/article/banking/emergency-fund-calculator',
+      desc: 'Calculate how much to save for emergencies. Aim for 3-6 months of expenses.',
+      icon: '🛟',
+    },
+    {
+      category: 'Money Management',
+      title: 'Student Investment Basics',
+      url: 'https://www.investor.gov/introduction-investing',
+      desc: 'Learn investing fundamentals, retirement accounts (Roth IRA), and starting small with stocks.',
+      icon: '📈',
+    },
+    {
+      category: 'Money Management',
+      title: 'Credit Card Basics for Students',
+      url: 'https://www.consumerfinance.gov/consumer-tools/credit-cards/',
+      desc: 'Understand APR, minimum payments, and how to use credit cards responsibly.',
+      icon: '💳',
+    },
+    {
+      category: 'Money Management',
+      title: 'Avoiding Financial Scams',
+      url: 'https://consumer.ftc.gov/articles/how-recognize-and-avoid-scams',
+      desc: 'Protect yourself from phishing, identity theft, and common student-targeted scams.',
+      icon: '🚫',
+    },
+    
+    // ORIGINAL RESOURCES
     {
       category: 'Financial Aid',
       title: 'Penn State Student Financial Education Center',
@@ -120,6 +311,21 @@ const ResourcesScreen: React.FC = () => {
 
   const studentTips: Tip[] = [
     {
+      icon: '💰',
+      title: 'File Taxes to Get Money Back',
+      desc: 'Even with part-time work, file taxes! You may get refunds and education credits worth $1,000-2,500.',
+    },
+    {
+      icon: '🎓',
+      title: 'Apply for Scholarships Year-Round',
+      desc: 'Don\'t stop after freshman year! Many scholarships are available for continuing students. Apply monthly.',
+    },
+    {
+      icon: '📊',
+      title: 'Track Your Loans',
+      desc: 'Know exactly how much you owe. Log into StudentAid.gov quarterly to track loan balances and interest.',
+    },
+    {
       icon: '🍕',
       title: 'Meal Planning Saves Money',
       desc: 'Cook meals in batches and pack lunches. You can save $100-200/month vs eating out daily.',
@@ -127,7 +333,7 @@ const ResourcesScreen: React.FC = () => {
     {
       icon: '📱',
       title: 'Student Discounts Everywhere',
-      desc: 'Use your .edu email! Get discounts on Spotify, Apple Music, Amazon Prime, and more.',
+      desc: 'Use your .edu email! Get discounts on Spotify, Apple Music, Amazon Prime, GitHub, and more.',
     },
     {
       icon: '📖',
@@ -148,6 +354,21 @@ const ResourcesScreen: React.FC = () => {
       icon: '🏋️',
       title: 'Free Campus Resources',
       desc: 'Use campus gym, health services, tutoring, and career counseling instead of paying outside.',
+    },
+    {
+      icon: '💵',
+      title: 'Start Emergency Fund Now',
+      desc: 'Even $10/week adds up. Aim for $500-1000 for unexpected expenses like car repairs or medical bills.',
+    },
+    {
+      icon: '🔍',
+      title: 'Review Financial Aid Every Year',
+      desc: 'Your aid can change! Resubmit FAFSA by priority deadlines to maximize grants and work-study.',
+    },
+    {
+      icon: '📲',
+      title: 'Use Free Budgeting Apps',
+      desc: 'Try Mint, YNAB (free for students), or this Budget Buddy app to track spending and stay on budget.',
     },
   ];
 
@@ -225,6 +446,22 @@ const ResourcesScreen: React.FC = () => {
     },
     content: {
       padding: 20,
+    },
+    disclaimerCard: {
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 20,
+      borderWidth: 2,
+      borderLeftWidth: 4,
+    },
+    disclaimerTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: 8,
+    },
+    disclaimerText: {
+      fontSize: 13,
+      lineHeight: 20,
     },
     sectionTitle: {
       fontSize: 20,
@@ -323,7 +560,7 @@ const ResourcesScreen: React.FC = () => {
           <Ionicons name="book-outline" size={28} color={colors.primary} />
           <Text style={dynamicStyles.header}>Student Resources</Text>
         </View>
-        <Text style={dynamicStyles.subtitle}>Financial tools and support for Penn State students</Text>
+        <Text style={dynamicStyles.subtitle}>Comprehensive financial education, scholarships, taxes, loans & money management</Text>
       </View>
 
       {/* Category Filter */}
@@ -355,6 +592,23 @@ const ResourcesScreen: React.FC = () => {
 
       {/* Content */}
       <ScrollView style={dynamicStyles.content}>
+        {/* Disclaimer */}
+        <View style={[dynamicStyles.disclaimerCard, { backgroundColor: colors.warning + '15', borderColor: colors.warning }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <Ionicons name="alert-circle-outline" size={24} color={colors.warning} style={{ marginRight: 10, marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[dynamicStyles.disclaimerTitle, { color: colors.text }]}>⚠️ Disclaimer</Text>
+              <Text style={[dynamicStyles.disclaimerText, { color: colors.textSecondary }]}>
+                Budget Buddy is not a financial advisor and we are not trained financial professionals. 
+                The resources and links provided are for educational purposes only. We do not endorse, 
+                guarantee, or take responsibility for any external websites, services, or information provided. 
+                Always verify information independently and consult with qualified financial professionals 
+                before making financial decisions.
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* Student Money Tips */}
         {activeCategory === 'All' && (
           <View style={dynamicStyles.tipsContainer}>

@@ -1,30 +1,72 @@
+// app/services/reminderService.ts
+import api from './api';
 
-// Temporary local in-memory storage for reminders
-let reminders: { date: string; time: string; message: string }[] = [];
-
-// Save a new reminder
-export const addReminder = async (date: string, time: string, message: string) => {
-  const newReminder = { date, time, message };
-  reminders.push(newReminder);
-  return newReminder;
+export type Reminder = {
+  id: string;
+  date: string;   // 'YYYY-MM-DD'
+  time: string;   // 'HH:MM'
+  message: string;
 };
 
-// Get reminders for a specific date
-export const getRemindersForDate = async (date: string) => {
-  return reminders.filter(r => r.date === date);
-};
-
-// Get all reminders
-export const getReminders = async () => {
-  return reminders;
-};
-
-// Load all reminders grouped by date for the calendar view
-export const loadAllRemindersForCalendar = async () => {
-  const grouped: Record<string, { time: string; message: string }[]> = {};
-  for (const r of reminders) {
-    if (!grouped[r.date]) grouped[r.date] = [];
-    grouped[r.date].push({ time: r.time, message: r.message });
+/**
+ * ✅ Fetch all reminders for all dates
+ * Used for calendar dot marking and scheduling.
+ */
+export async function getReminders(): Promise<Reminder[]> {
+  try {
+    console.log('[getReminders] Fetching all reminders from backend...');
+    const res = await api.get('/reminders');
+    console.log('[getReminders] Response:', res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error('[getReminders] Error:', error.response?.data || error.message);
+    throw error;
   }
-  return grouped;
-};
+}
+
+/**
+ * ✅ Fetch reminders for a specific date (YYYY-MM-DD)
+ */
+export async function getRemindersForDate(date: string): Promise<Reminder[]> {
+  try {
+    console.log('[getRemindersForDate] Fetching reminders for', date);
+    const res = await api.get(`/reminders/${date}`);
+    console.log('[getRemindersForDate] Response:', res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error('[getRemindersForDate] Error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Add a new reminder for a given date/time/message
+ */
+export async function addReminder(
+  date: string,
+  time: string,
+  message: string
+): Promise<Reminder> {
+  try {
+    console.log('[addReminder] Sending new reminder to backend:', { date, time, message });
+    const res = await api.post('/reminders', { date, time, message });
+    console.log('[addReminder] Response:', res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error('[addReminder] Error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Optional helper to delete a reminder (if you later add that feature)
+ */
+export async function deleteReminder(id: string): Promise<void> {
+  try {
+    console.log('[deleteReminder] Deleting reminder:', id);
+    await api.delete(`/reminders/${id}`);
+  } catch (error: any) {
+    console.error('[deleteReminder] Error:', error.response?.data || error.message);
+    throw error;
+  }
+}

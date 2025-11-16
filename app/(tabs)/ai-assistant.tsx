@@ -1,27 +1,29 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import {
-    ChatMessage,
-    getQuickInsights,
-    getSuggestedQuestions,
-    sendMessageToAI,
+  ChatMessage,
+  getQuickInsights,
+  getSuggestedQuestions,
+  sendMessageToAI,
 } from '../services/aiService';
 
 export default function AIAssistantScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -329,11 +331,22 @@ export default function AIAssistantScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🤖 AI Financial Advisor</Text>
-        <Text style={styles.headerSubtitle}>
-          Ask me anything about your finances
-        </Text>
-      </View>
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    <TouchableOpacity
+      onPress={() => router.back()}
+      style={{ marginRight: 12, padding: 4 }}
+    >
+      <Ionicons name="arrow-back" size={24} color={colors.text} />
+    </TouchableOpacity>
+
+    <View>
+      <Text style={styles.headerTitle}>🤖 AI Financial Advisor</Text>
+      <Text style={styles.headerSubtitle}>
+        Ask me anything about your finances
+      </Text>
+    </View>
+  </View>
+</View>
 
       {/* Quick Insights */}
       {!loadingInsights && quickInsights.length > 0 && messages.length === 0 && (

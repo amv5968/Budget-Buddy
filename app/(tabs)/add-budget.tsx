@@ -1,18 +1,26 @@
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { addBudget } from '../services/budgetService';
 
-const BUDGET_CATEGORIES = [
+const INCOME_CATEGORIES = [
+  { name: 'Salary', icon: '💰' },
+  { name: 'Freelance', icon: '💼' },
+  { name: 'Investment', icon: '📈' },
+  { name: 'Business', icon: '🏢' },
+  { name: 'Other', icon: '💵' },
+];
+
+const EXPENSE_CATEGORIES = [
   { name: 'Groceries', icon: '🛒' },
   { name: 'Transport', icon: '🚗' },
   { name: 'Food', icon: '🍔' },
@@ -27,6 +35,9 @@ const BUDGET_CATEGORIES = [
 
 export default function AddBudgetScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)/budgets';
+  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
   const [category, setCategory] = useState('');
   const [icon, setIcon] = useState('');
   const [amount, setAmount] = useState('');
@@ -46,13 +57,14 @@ export default function AddBudgetScreen() {
     setLoading(true);
     try {
       await addBudget({
+        type,
         category,
         totalAmount: parseFloat(amount),
         icon,
       });
 
       Alert.alert('Success', 'Budget created successfully!');
-      router.back();
+      router.navigate(returnTo as any);
     } catch (error: any) {
       console.error('Error creating budget:', error);
       const errorMessage = error.response?.data?.error || 'Failed to create budget';
@@ -62,22 +74,72 @@ export default function AddBudgetScreen() {
     }
   };
 
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Create Budget</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Monthly Budget Amount</Text>
+        <Text style={styles.label}>Budget Type</Text>
+        <View style={styles.typeContainer}>
+          <TouchableOpacity
+            style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
+            onPress={() => {
+              setType('Income');
+              setCategory(''); // Reset category when switching type
+              setIcon('');
+            }}
+          >
+            <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
+              💰 Income
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
+            onPress={() => {
+              setType('Expense');
+              setCategory(''); // Reset category when switching type
+              setIcon('');
+            }}
+          >
+            <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
+              💸 Expense
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>
+          {type === 'Income' ? 'Expected Monthly Income' : 'Monthly Budget Amount'}
+        </Text>
         <TextInput
           style={styles.amountInput}
-          placeholder="0.00"
+          placeholder="$0.00"
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={(text) => {
+            // Remove non-numeric characters except decimal point
+            const cleaned = text.replace(/[^0-9.]/g, '');
+            // Ensure only one decimal point
+            const parts = cleaned.split('.');
+            let formatted = parts[0];
+            if (parts.length > 1) {
+              formatted += '.' + parts.slice(1).join('').substring(0, 2);
+            }
+            // Cap at $999,999,999.99
+            const numValue = parseFloat(formatted) || 0;
+            if (numValue <= 999999999.99) {
+              setAmount(formatted);
+            }
+          }}
           keyboardType="decimal-pad"
           placeholderTextColor="#999"
         />
@@ -86,7 +148,7 @@ export default function AddBudgetScreen() {
       <View style={styles.section}>
         <Text style={styles.label}>Select Category</Text>
         <View style={styles.categoryGrid}>
-          {BUDGET_CATEGORIES.map((cat) => (
+          {(type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
             <TouchableOpacity
               key={cat.name}
               style={[
@@ -224,5 +286,31 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  typeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 10,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+  },
+  typeButtonActive: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+  },
+  typeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  typeTextActive: {
+    color: '#2196F3',
   },
 });

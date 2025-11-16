@@ -3,6 +3,7 @@ import api from '../../budget-buddy-backend/config/api';
 export interface Budget {
   _id: string;
   userId: string;
+  type?: 'Income' | 'Expense';
   category: string;
   totalAmount: number;
   spentAmount: number;
@@ -16,6 +17,7 @@ export const getBudgets = async (): Promise<Budget[]> => {
 };
 
 export const addBudget = async (data: {
+  type?: 'Income' | 'Expense';
   category: string;
   totalAmount: number;
   icon?: string;

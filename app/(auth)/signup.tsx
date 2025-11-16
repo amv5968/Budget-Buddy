@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet,
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
-  Alert
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { signup as apiSignup } from '../services/authService';
 import { useAuth } from '../../context/AuthContext';
+import { signup as apiSignup } from '../services/authService';
+
+// Password validation helper (used on submit)
+const validatePassword = (password: string): { valid: boolean; message: string } => {
+  if (password.length < 6) {
+    return { valid: false, message: 'Password must be at least 6 characters' };
+  }
+  if (password.length > 32) {
+    return { valid: false, message: 'Password must be at most 32 characters' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)',
+    };
+  }
+  return { valid: true, message: '' };
+};
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -22,26 +47,64 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Focus states for live rules
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [usernameFocused, setUsernameFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmFocused, setConfirmFocused] = useState(false);
+
   const router = useRouter();
   const { login } = useAuth();
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Live rule booleans
+  const isEmailValid = emailRegex.test(email);
+  const isEmailLengthOk = email.length > 0 && email.length <= 100;
+  const isEmailLoginOk = isEmailValid; // proxy rule
+
+  const usernameLen = username.length;
+  const usernameMinOk = usernameLen >= 3;
+  const usernameMaxOk = usernameLen > 0 && usernameLen <= 32;
+  const usernameLoginOk = usernameMinOk; // proxy
+
+  const hasLower = /[a-z]/.test(password);
+  const hasUpper = /[A-Z]/.test(password);
+  const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+  const passwordLengthOk = password.length >= 6 && password.length <= 32;
+
+  const confirmMatchOk = confirmPassword.length > 0 && confirmPassword === password;
+
+  // Color helper: grey when empty, green if ok, red if not
+  const getRuleColor = (value: string, ok: boolean) => {
+    if (value.length === 0) return '#777';
+    return ok ? '#4CAF50' : '#E53935';
+  };
 
   const handleSignUp = async () => {
     if (!email.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-    
+
+    if (username.trim().length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters');
+      return;
+    }
+
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    // Validate password requirements
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      Alert.alert('Password Requirements', passwordValidation.message);
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
@@ -55,7 +118,8 @@ export default function SignUpScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Signup error:', error);
-      const errorMessage = error.response?.data?.error || 'Signup failed. Please try again.';
+      const errorMessage =
+        error.response?.data?.error || 'Signup failed. Please try again.';
       Alert.alert('Signup Failed', errorMessage);
     } finally {
       setLoading(false);
@@ -69,11 +133,11 @@ export default function SignUpScreen() {
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
     >
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -87,57 +151,287 @@ export default function SignUpScreen() {
             </View>
 
             <View style={styles.inputSection}>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Email"
-                  value={email}
-                  onChangeText={setEmail}
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  editable={!loading}
-                />
+              {/* Email */}
+              <View style={styles.fieldContainer}>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    placeholder="Email"
+                    value={email}
+                    onChangeText={(text) => {
+                      if (text.length <= 100) {
+                        setEmail(text);
+                        if (text.length === 100) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Email cannot exceed 100 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Email Too Long',
+                          'Email must be 100 characters or less'
+                        );
+                      }
+                    }}
+                    style={styles.input}
+                    placeholderTextColor="#999"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    editable={!loading}
+                    maxLength={100}
+                    onFocus={() => setEmailFocused(true)}
+                    onBlur={() => setEmailFocused(false)}
+                  />
+                </View>
+
+                {emailFocused && (
+                  <View style={styles.rulesBox}>
+                    <Text
+                      style={[
+                        styles.ruleText,
+                        { color: getRuleColor(email, isEmailValid) },
+                      ]}
+                    >
+                      • Email must be valid
+                    </Text>
+                    <Text
+                      style={[
+                        styles.ruleText,
+                        { color: getRuleColor(email, isEmailLengthOk) },
+                      ]}
+                    >
+                      • Max 100 characters
+                    </Text>
+                    <Text
+                      style={[
+                        styles.ruleText,
+                        { color: getRuleColor(email, isEmailLoginOk) },
+                      ]}
+                    >
+                      • This email will be used to log in
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Username"
-                  value={username}
-                  onChangeText={setUsername}
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  autoCapitalize="none"
-                  editable={!loading}
-                />
+              {/* Username */}
+              <View style={styles.fieldContainer}>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    placeholder="Username"
+                    value={username}
+                    onChangeText={(text) => {
+                      if (text.length <= 32) {
+                        setUsername(text);
+                        if (text.length === 32) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Username cannot exceed 32 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Username Too Long',
+                          'Username must be 32 characters or less'
+                        );
+                      }
+                    }}
+                    style={styles.input}
+                    placeholderTextColor="#999"
+                    autoCapitalize="none"
+                    editable={!loading}
+                    maxLength={32}
+                    onFocus={() => setUsernameFocused(true)}
+                    onBlur={() => setUsernameFocused(false)}
+                  />
+                </View>
+
+                {usernameFocused && (
+                  <View style={styles.rulesBox}>
+                    <Text
+                      style={[
+                        styles.ruleText,
+                        { color: getRuleColor(username, usernameMinOk) },
+                      ]}
+                    >
+                      • Minimum 3 characters
+                    </Text>
+                    <Text
+                      style={[
+                        styles.ruleText,
+                        { color: getRuleColor(username, usernameMaxOk) },
+                      ]}
+                    >
+                      • Maximum 32 characters
+                    </Text>
+                    <Text
+                      style={[
+                        styles.ruleText,
+                        { color: getRuleColor(username, usernameLoginOk) },
+                      ]}
+                    >
+                      • This username will be used to log in
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Password (min 6 characters)"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                />
-              </View>
+              {/* Password */}
+<View style={styles.fieldContainer}>
+  <View style={styles.inputContainer}>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <TextInput
+        placeholder="Password"
+        value={password}
+        onChangeText={(text) => {
+          if (text.length <= 32) {
+            setPassword(text);
+            if (text.length === 32) {
+              Alert.alert(
+                'Character Limit Reached',
+                'Password cannot exceed 32 characters'
+              );
+            }
+          } else {
+            Alert.alert(
+              'Password Too Long',
+              'Password must be 32 characters or less'
+            );
+          }
+        }}
+        secureTextEntry={!passwordFocused}   // Hide/Show logic
+        style={[styles.input, { flex: 1 }]}
+        placeholderTextColor="#999"
+        editable={!loading}
+        maxLength={32}
+        onFocus={() => setPasswordFocused(true)}
+        onBlur={() => setPasswordFocused(false)}
+      />
 
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                />
-              </View>
+      {/* Ionicons Show/Hide Button */}
+      <TouchableOpacity
+        style={{ paddingHorizontal: 10 }}
+        onPress={() => setPasswordFocused((prev) => !prev)}
+      >
+        <Ionicons
+          name={passwordFocused ? "eye-off-outline" : "eye-outline"}
+          size={22}
+          color="#555"
+        />
+      </TouchableOpacity>
+    </View>
+  </View>
 
-              <TouchableOpacity 
-                style={[styles.signupButton, loading && styles.signupButtonDisabled]} 
+  {passwordFocused && (
+    <View style={styles.rulesBox}>
+      <Text
+        style={[
+          styles.ruleText,
+          { color: getRuleColor(password, hasLower) },
+        ]}
+      >
+        • Must include at least one lowercase letter
+      </Text>
+
+      <Text
+        style={[
+          styles.ruleText,
+          { color: getRuleColor(password, hasUpper) },
+        ]}
+      >
+        • Must include at least one uppercase letter
+      </Text>
+
+      <Text
+        style={[
+          styles.ruleText,
+          { color: getRuleColor(password, hasSpecial) },
+        ]}
+      >
+        • Must include at least one special character
+      </Text>
+
+      <Text
+        style={[
+          styles.ruleText,
+          { color: getRuleColor(password, passwordLengthOk) },
+        ]}
+      >
+        • Between 6 and 32 characters
+      </Text>
+    </View>
+  )}
+</View>
+
+
+              {/* Confirm Password */}
+<View style={styles.fieldContainer}>
+  <View style={styles.inputContainer}>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <TextInput
+        placeholder="Confirm Password"
+        value={confirmPassword}
+        onChangeText={(text) => {
+          if (text.length <= 32) {
+            setConfirmPassword(text);
+            if (text.length === 32) {
+              Alert.alert(
+                'Character Limit Reached',
+                'Password cannot exceed 32 characters'
+              );
+            }
+          } else {
+            Alert.alert(
+              'Password Too Long',
+              'Password must be 32 characters or less'
+            );
+          }
+        }}
+        secureTextEntry={!confirmFocused} // 🔥 Show/Hide logic
+        style={[styles.input, { flex: 1 }]}
+        placeholderTextColor="#999"
+        editable={!loading}
+        maxLength={32}
+        onFocus={() => setConfirmFocused(true)}
+        onBlur={() => setConfirmFocused(false)}
+      />
+
+      {/* 👁 Ionicons Show/Hide Button */}
+      <TouchableOpacity
+        style={{ paddingHorizontal: 10 }}
+        onPress={() => setConfirmFocused((prev) => !prev)}
+      >
+        <Ionicons
+          name={confirmFocused ? "eye-off-outline" : "eye-outline"}
+          size={22}
+          color="#555"
+        />
+      </TouchableOpacity>
+    </View>
+  </View>
+
+  {confirmFocused && (
+    <View style={styles.rulesBox}>
+      <Text
+        style={[
+          styles.ruleText,
+          {
+            color: getRuleColor(
+              confirmPassword,
+              confirmPassword === password && confirmPassword.length > 0
+            ),
+          },
+        ]}
+      >
+        • Must match the password above exactly
+      </Text>
+    </View>
+  )}
+</View>
+
+
+              <TouchableOpacity
+                style={[styles.signupButton, loading && styles.signupButtonDisabled]}
                 onPress={handleSignUp}
                 activeOpacity={0.8}
                 disabled={loading}
@@ -220,16 +514,29 @@ const styles = StyleSheet.create({
   inputSection: {
     width: '100%',
   },
+  fieldContainer: {
+    marginBottom: 16,
+  },
   inputContainer: {
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
-    marginBottom: 16,
     overflow: 'hidden',
   },
   input: {
     padding: 18,
     fontSize: 16,
     color: '#333',
+  },
+  rulesBox: {
+    marginTop: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+  },
+  ruleText: {
+    fontSize: 12,
+    marginBottom: 2,
   },
   signupButton: {
     backgroundColor: '#66BB6A',

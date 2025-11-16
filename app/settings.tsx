@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -11,14 +11,15 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
-import { scheduleWeeklySummary, scheduleDailyTransactionReminder } from './services/notificationService';
+import { scheduleDailyTransactionReminder, scheduleWeeklySummary } from './services/notificationService';
 
 const SETTINGS_KEY = 'bb.settings.v1';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const returnTo = (params.returnTo as string) || '/(tabs)';
   const { theme, themeMode, setThemeMode, colors } = useTheme();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -61,6 +62,11 @@ export default function SettingsScreen() {
       icon: '🎯',
     },
   ]);
+
+  // Billing/Subscription state
+  const [currentPlan, setCurrentPlan] = useState<'monthly' | 'yearly' | null>('monthly');
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'active' | 'cancelled' | 'expired'>('active');
+  const [nextBillingDate, setNextBillingDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
   // Load settings on mount
   useEffect(() => {
@@ -171,9 +177,12 @@ const handleSave = async () => {
     },
     backButton: {
       marginRight: 12,
-      backgroundColor: colors.border,
       padding: 8,
-      borderRadius: 8,
+    },
+    backText: {
+      fontSize: 16,
+      color: '#2196F3',
+      fontWeight: '600',
     },
     header: {
       fontSize: 26,
@@ -280,14 +289,259 @@ const handleSave = async () => {
       marginLeft: 10,
       color: colors.text,
     },
+    // Billing styles
+    currentPlanCard: {
+      padding: 20,
+      borderRadius: 12,
+      marginBottom: 20,
+      borderWidth: 2,
+      elevation: 2,
+    },
+    planTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    planPrice: {
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    statusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+    statusText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    billingInfo: {
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    billingLabel: {
+      fontSize: 12,
+      marginBottom: 4,
+      textTransform: 'uppercase',
+      fontWeight: '600',
+    },
+    billingDate: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    manageBillingButton: {
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    manageBillingText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    subSectionTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: 12,
+      marginTop: 8,
+    },
+    planOption: {
+      padding: 20,
+      borderRadius: 12,
+      marginBottom: 16,
+      borderWidth: 2,
+      elevation: 2,
+    },
+    planOptionTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    planOptionDesc: {
+      fontSize: 14,
+      marginBottom: 8,
+    },
+    planOptionPrice: {
+      fontSize: 28,
+      fontWeight: '800',
+    },
+    yearlyEquivalent: {
+      fontSize: 13,
+      fontStyle: 'italic',
+      marginTop: 2,
+    },
+    currentBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+    currentBadgeText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    saveBadgeContainer: {
+      position: 'absolute',
+      top: -10,
+      right: 10,
+      zIndex: 1,
+    },
+    saveBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+    saveBadgeText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    featuresList: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    featureItem: {
+      fontSize: 14,
+      marginBottom: 6,
+    },
+    cancelButton: {
+      paddingVertical: 14,
+      borderRadius: 10,
+      borderWidth: 2,
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    cancelButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    billingDisclaimer: {
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+    },
+    disclaimerTextSmall: {
+      fontSize: 12,
+      lineHeight: 18,
+    },
   });
+
+  const handleGoBack = () => {
+    router.navigate(returnTo as any);
+  };
+
+  // Billing handlers
+  const handleSelectPlan = (plan: 'monthly' | 'yearly') => {
+    const planName = plan === 'monthly' ? 'Monthly ($14/month)' : 'Yearly ($100/year - Save $68!)';
+    const price = plan === 'monthly' ? '$14' : '$100';
+    
+    Alert.alert(
+      'Confirm Subscription',
+      `You're about to subscribe to the ${planName} plan.\n\nYou will be charged ${price}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Subscribe',
+          onPress: () => processPayment(plan),
+        },
+      ]
+    );
+  };
+
+  const processPayment = async (plan: 'monthly' | 'yearly') => {
+    try {
+
+      
+      Alert.alert('Processing...', 'Please wait while we process your payment.');
+
+      setTimeout(() => {
+        setCurrentPlan(plan);
+        setSubscriptionStatus('active');
+        const daysToAdd = plan === 'monthly' ? 30 : 365;
+        setNextBillingDate(new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000));
+        
+        Alert.alert(
+          '✅ Payment Successful!',
+          `Welcome to Budget Buddy Premium! Your ${plan === 'monthly' ? 'monthly' : 'yearly'} subscription is now active.`,
+          [{ text: 'Get Started', onPress: () => router.push('/(tabs)') }]
+        );
+      }, 1500);
+      
+      
+    } catch (error) {
+      console.error('Payment error:', error);
+      Alert.alert('Payment Failed', 'There was an error processing your payment. Please try again.');
+    }
+  };
+
+  const handleCancelSubscription = () => {
+    Alert.alert(
+      '⚠️ Cancel Subscription',
+      `Are you sure you want to cancel your subscription?\n\nYou'll lose access to premium features at the end of your billing period (${nextBillingDate.toLocaleDateString()}).`,
+      [
+        { text: 'Keep Subscription', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => {
+            setSubscriptionStatus('cancelled');
+            Alert.alert(
+              'Subscription Cancelled',
+              `Your subscription has been cancelled. You'll have access until ${nextBillingDate.toLocaleDateString()}.`
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const handleChangePlan = (newPlan: 'monthly' | 'yearly') => {
+    const currentPlanName = currentPlan === 'monthly' ? 'Monthly' : 'Yearly';
+    const newPlanName = newPlan === 'monthly' ? 'Monthly ($14/month)' : 'Yearly ($100/year)';
+    
+    Alert.alert(
+      'Change Plan',
+      `Switch from ${currentPlanName} to ${newPlanName}?\n\nChanges will take effect on your next billing cycle.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Change Plan',
+          onPress: () => {
+            setCurrentPlan(newPlan);
+            Alert.alert('Plan Updated', `Your subscription will change to ${newPlanName} on ${nextBillingDate.toLocaleDateString()}.`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleManageBilling = () => {
+    Alert.alert(
+      'Manage Billing',
+      'View payment history, update payment method, and download invoices.',
+      [
+        { text: 'Payment History', onPress: () => Alert.alert('Payment History', 'Feature coming soon!') },
+        { text: 'Update Payment Method', onPress: () => Alert.alert('Update Payment', 'Feature coming soon!') },
+        { text: 'Close', style: 'cancel' },
+      ]
+    );
+  };
+
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
 
   return (
     <ScrollView contentContainerStyle={dynamicStyles.container}>
       {/* Header with Back Button */}
       <View style={dynamicStyles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} style={dynamicStyles.backButton}>
-          <Ionicons name="arrow-back" size={26} color={colors.text} />
+        <TouchableOpacity onPress={handleGoBack} style={dynamicStyles.backButton}>
+          <Text style={dynamicStyles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={dynamicStyles.header}>Settings</Text>
       </View>
@@ -328,6 +582,165 @@ const handleSave = async () => {
           <Text style={{ fontSize: 24 }}>🔄</Text>
           <Text style={dynamicStyles.themeOptionText}>Auto (System)</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Billing & Subscription Section */}
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionHeader}>💳 Billing & Subscription</Text>
+        
+        {/* Current Plan Status */}
+        {currentPlan && (
+          <View style={[dynamicStyles.currentPlanCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View>
+                <Text style={[dynamicStyles.planTitle, { color: colors.text }]}>
+                  ✨ {currentPlan === 'monthly' ? 'Monthly Premium' : 'Yearly Premium'}
+                </Text>
+                <Text style={[dynamicStyles.planPrice, { color: colors.primary }]}>
+                  {currentPlan === 'monthly' ? '$14/month' : '$100/year'}
+                </Text>
+              </View>
+              <View style={[dynamicStyles.statusBadge, { 
+                backgroundColor: subscriptionStatus === 'active' ? '#4CAF50' : 
+                                 subscriptionStatus === 'cancelled' ? '#FF9800' : '#F44336' 
+              }]}>
+                <Text style={dynamicStyles.statusText}>
+                  {subscriptionStatus === 'active' ? '✓ Active' : 
+                   subscriptionStatus === 'cancelled' ? '⏸ Cancelled' : '✗ Expired'}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={dynamicStyles.billingInfo}>
+              <Text style={[dynamicStyles.billingLabel, { color: colors.textSecondary }]}>
+                {subscriptionStatus === 'active' ? 'Next billing date:' : 'Access until:'}
+              </Text>
+              <Text style={[dynamicStyles.billingDate, { color: colors.text }]}>
+                {formatDate(nextBillingDate)}
+              </Text>
+            </View>
+
+            {subscriptionStatus === 'active' && (
+              <View style={{ marginTop: 12 }}>
+                <TouchableOpacity
+                  style={[dynamicStyles.manageBillingButton, { backgroundColor: colors.primary }]}
+                  onPress={handleManageBilling}
+                >
+                  <Text style={dynamicStyles.manageBillingText}>Manage Billing</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Plan Options */}
+        <Text style={[dynamicStyles.subSectionTitle, { color: colors.text }]}>
+          {currentPlan ? 'Change Plan' : 'Choose Your Plan'}
+        </Text>
+        
+        {/* Monthly Plan */}
+        <TouchableOpacity
+          style={[
+            dynamicStyles.planOption,
+            { 
+              borderColor: currentPlan === 'monthly' ? colors.primary : colors.border,
+              backgroundColor: currentPlan === 'monthly' ? colors.primary + '10' : colors.cardBackground 
+            }
+          ]}
+          onPress={() => currentPlan === 'monthly' ? null : handleSelectPlan('monthly')}
+          disabled={currentPlan === 'monthly'}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[dynamicStyles.planOptionTitle, { color: colors.text }]}>
+                📅 Monthly Plan
+              </Text>
+              <Text style={[dynamicStyles.planOptionDesc, { color: colors.textSecondary }]}>
+                Perfect for getting started
+              </Text>
+              <Text style={[dynamicStyles.planOptionPrice, { color: colors.primary }]}>
+                $14 <Text style={{ fontSize: 14, color: colors.textSecondary }}>/month</Text>
+              </Text>
+            </View>
+            {currentPlan === 'monthly' && (
+              <View style={[dynamicStyles.currentBadge, { backgroundColor: colors.primary }]}>
+                <Text style={dynamicStyles.currentBadgeText}>Current</Text>
+              </View>
+            )}
+          </View>
+          <View style={dynamicStyles.featuresList}>
+            <Text style={[dynamicStyles.featureItem, { color: colors.text }]}>✓ All premium features</Text>
+            <Text style={[dynamicStyles.featureItem, { color: colors.text }]}>✓ Priority support</Text>
+            <Text style={[dynamicStyles.featureItem, { color: colors.text }]}>✓ Cancel anytime</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Yearly Plan */}
+        <TouchableOpacity
+          style={[
+            dynamicStyles.planOption,
+            { 
+              borderColor: currentPlan === 'yearly' ? colors.primary : colors.border,
+              backgroundColor: currentPlan === 'yearly' ? colors.primary + '10' : colors.cardBackground 
+            }
+          ]}
+          onPress={() => currentPlan === 'yearly' ? null : handleSelectPlan('yearly')}
+          disabled={currentPlan === 'yearly'}
+        >
+          <View style={dynamicStyles.saveBadgeContainer}>
+            <View style={[dynamicStyles.saveBadge, { backgroundColor: '#4CAF50' }]}>
+              <Text style={dynamicStyles.saveBadgeText}>💰 SAVE $68</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[dynamicStyles.planOptionTitle, { color: colors.text }]}>
+                📊 Yearly Plan
+              </Text>
+              <Text style={[dynamicStyles.planOptionDesc, { color: colors.textSecondary }]}>
+                Best value - save 40%!
+              </Text>
+              <Text style={[dynamicStyles.planOptionPrice, { color: colors.primary }]}>
+                $100 <Text style={{ fontSize: 14, color: colors.textSecondary }}>/year</Text>
+              </Text>
+              <Text style={[dynamicStyles.yearlyEquivalent, { color: colors.textSecondary }]}>
+                Only $8.33/month
+              </Text>
+            </View>
+            {currentPlan === 'yearly' && (
+              <View style={[dynamicStyles.currentBadge, { backgroundColor: colors.primary }]}>
+                <Text style={dynamicStyles.currentBadgeText}>Current</Text>
+              </View>
+            )}
+          </View>
+          <View style={dynamicStyles.featuresList}>
+            <Text style={[dynamicStyles.featureItem, { color: colors.text }]}>✓ All premium features</Text>
+            <Text style={[dynamicStyles.featureItem, { color: colors.text }]}>✓ Priority support</Text>
+            <Text style={[dynamicStyles.featureItem, { color: colors.text }]}>✓ 2 months FREE</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Cancel Subscription Button */}
+        {currentPlan && subscriptionStatus === 'active' && (
+          <TouchableOpacity
+            style={[dynamicStyles.cancelButton, { borderColor: colors.expense }]}
+            onPress={handleCancelSubscription}
+          >
+            <Text style={[dynamicStyles.cancelButtonText, { color: colors.expense }]}>
+              Cancel Subscription
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Billing Disclaimer */}
+        <View style={[dynamicStyles.billingDisclaimer, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+          <Text style={[dynamicStyles.disclaimerTextSmall, { color: colors.textSecondary }]}>
+            • Subscriptions auto-renew unless cancelled{'\n'}
+            • Cancel anytime before renewal{'\n'}
+            • All prices in USD{'\n'}
+            • Secure payment processing
+          </Text>
+        </View>
       </View>
 
       {/* Notifications Section */}

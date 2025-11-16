@@ -4,7 +4,7 @@ import { getBudgets } from './budgetService';
 import { getGoals } from './goalService';
 import { getTransactions, getTransactionStats } from './transactionService';
 
-const GEMINI_API_KEY = 'AIzaSyDPjYpO5PU3eowsFLjMk-NV3DWvpG-_mSI';
+const GEMINI_API_KEY = 'AIzaSyD-fN540G9qiLTXWOPR_mDENqvoKCsw2gc';
 
 let genAI: GoogleGenerativeAI | null = null;
 let initializationError: string | null = null;

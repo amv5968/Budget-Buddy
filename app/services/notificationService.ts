@@ -1,87 +1,79 @@
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// app/services/notificationService.ts
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { getTransactionStats, type Transaction } from '../services/transactionService';
 
-// 🔑 AsyncStorage key for notification settings
-const SETTINGS_KEY = 'bb_notification_settings';
+const SETTINGS_KEY = 'bb.settings.v1';
 
-// ===== Default foreground behavior (ONE handler only) =====
+// Configure notification handler
 Notifications.setNotificationHandler({
-  // widen type to avoid TS complaining about iOS-only fields
-  handleNotification: async (): Promise<any> => ({
+  handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true, // iOS
-    shouldShowList: true,   // iOS
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
-// ===== Permissions =====
+// Request permissions
 export async function requestNotificationPermissions() {
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
-
+  
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-
+  
   if (finalStatus !== 'granted') {
-    console.log('🔕 Notification permissions not granted');
+    console.log('Notification permissions not granted');
     return false;
   }
+  
   return true;
 }
 
-// ===== Simple one-off reminder used by HomeScreen =====
-// 👉 This is the function your Home screen imports.
-export async function scheduleReminderNotification(fireDate: Date, body: string) {
-  const trigger: Notifications.DateTriggerInput = {
-    type: Notifications.SchedulableTriggerInputTypes.DATE,
-    date: fireDate,
-  };
-
-  await Notifications.scheduleNotificationAsync({
-    content: { title: '💡 Reminder', body },
-    trigger, // ✅ typed trigger object
-  });
-}
-
-// ===== Helpers for repeating triggers (Android timing helpers) =====
+// Calculate seconds until next occurrence of a specific time
 function getSecondsUntilTime(hour: number, minute: number): number {
   const now = new Date();
   const target = new Date();
   target.setHours(hour, minute, 0, 0);
-  if (target <= now) target.setDate(target.getDate() + 1);
+  
+  if (target <= now) {
+    target.setDate(target.getDate() + 1);
+  }
+  
   return Math.floor((target.getTime() - now.getTime()) / 1000);
 }
 
+// Calculate seconds until next Monday at specific time
 function getSecondsUntilMonday(hour: number, minute: number): number {
   const now = new Date();
   const target = new Date();
   target.setHours(hour, minute, 0, 0);
-  const daysUntilMonday = (1 + 7 - now.getDay()) % 7 || 7; // 1 = Monday
+  
+  const daysUntilMonday = (1 + 7 - now.getDay()) % 7 || 7;
   target.setDate(now.getDate() + daysUntilMonday);
-  if (target <= now) target.setDate(target.getDate() + 7);
+  
+  if (target <= now) {
+    target.setDate(target.getDate() + 7);
+  }
+  
   return Math.floor((target.getTime() - now.getTime()) / 1000);
 }
 
-// ===== Daily summary (settings screen toggle) =====
-export async function scheduleDailyTransactionReminder(
-  enabled: boolean,
-  hour: number = 20,
-  minute: number = 0
-) {
-  // cancel previous daily summaries
+// Schedule daily transaction summary notification
+export async function scheduleDailyTransactionReminder(enabled: boolean, hour: number = 20, minute: number = 0) {
+  // Cancel existing daily reminders
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  for (const n of scheduled) {
-    if (n.content.title?.includes('Daily Summary')) {
-      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  for (const notif of scheduled) {
+    if (notif.content.title?.includes('Daily Summary')) {
+      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
     }
   }
+  
   if (!enabled) return;
 
   const hasPermission = await requestNotificationPermissions();
@@ -102,7 +94,7 @@ export async function scheduleDailyTransactionReminder(
       } as Notifications.CalendarTriggerInput,
     });
   } else {
-    // first fire at the next occurrence today/tomorrow
+    // Android: Use daily repeating trigger
     const secondsUntilTime = getSecondsUntilTime(hour, minute);
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -116,8 +108,8 @@ export async function scheduleDailyTransactionReminder(
         repeats: false,
       },
     });
-
-    // then repeat daily
+    
+    // Schedule repeating daily notification
     await Notifications.scheduleNotificationAsync({
       content: {
         title: '📊 Daily Summary',
@@ -134,40 +126,50 @@ export async function scheduleDailyTransactionReminder(
   }
 }
 
-// ===== Instant alert when a transaction is added =====
+// Send immediate notification for new transaction
 export async function notifyNewTransaction(transaction: Transaction) {
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
   const raw = await AsyncStorage.getItem(SETTINGS_KEY);
   const settings = raw ? JSON.parse(raw) : { transactionAlerts: true };
+  
   if (!settings.transactionAlerts) return;
 
   const emoji = transaction.type === 'Income' ? '💰' : '💸';
   const sign = transaction.type === 'Income' ? '+' : '-';
-
+  
   await Notifications.scheduleNotificationAsync({
     content: {
       title: `${emoji} ${transaction.type} Added`,
       body: `${transaction.category}: ${sign}$${Math.abs(transaction.amount).toFixed(2)}`,
-      data: { type: 'transaction', transactionId: transaction._id, date: transaction.date },
+      data: { 
+        type: 'transaction', 
+        transactionId: transaction._id,
+        date: transaction.date 
+      },
     },
-    trigger: null, // immediate
+    trigger: null, // Immediate
   });
 }
 
-// ===== “Tap a date” summary =====
+// Send notification for transactions on selected calendar date
 export async function notifyDateTransactions(date: string, transactions: Transaction[]) {
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
-  const d = new Date(date);
-  const pretty = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const dateObj = new Date(date);
+  const formattedDate = dateObj.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric',
+    year: 'numeric'
+  });
 
+  // If no transactions, still send notification
   if (transactions.length === 0) {
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `📅 ${pretty}`,
+        title: `📅 ${formattedDate}`,
         body: 'No transactions on this date. Tap to add one!',
         data: { type: 'date_summary', date, hasTransactions: false },
       },
@@ -176,12 +178,18 @@ export async function notifyDateTransactions(date: string, transactions: Transac
     return;
   }
 
-  const income = transactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
-  const expense = transactions.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount), 0);
+  // Calculate totals
+  const income = transactions
+    .filter(t => t.type === 'Income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const expense = transactions
+    .filter(t => t.type === 'Expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: `📅 ${pretty} - ${transactions.length} Transaction${transactions.length !== 1 ? 's' : ''}`,
+      title: `📅 ${formattedDate} - ${transactions.length} Transaction${transactions.length !== 1 ? 's' : ''}`,
       body: `Income: $${income.toFixed(2)} | Expenses: $${expense.toFixed(2)}`,
       data: { type: 'date_summary', date, hasTransactions: true },
     },
@@ -189,14 +197,15 @@ export async function notifyDateTransactions(date: string, transactions: Transac
   });
 }
 
-// ===== Weekly summary =====
+// Schedule weekly summary notification
 export async function scheduleWeeklySummary(enabled: boolean, hour: number = 9, minute: number = 0) {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  for (const n of scheduled) {
-    if (n.content.title?.includes('Weekly Summary')) {
-      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  for (const notif of scheduled) {
+    if (notif.content.title?.includes('Weekly Summary')) {
+      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
     }
   }
+  
   if (!enabled) return;
 
   const hasPermission = await requestNotificationPermissions();
@@ -211,14 +220,14 @@ export async function scheduleWeeklySummary(enabled: boolean, hour: number = 9, 
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        weekday: 2, // Monday (iOS: 1=Sun)
+        weekday: 2, // Monday (iOS uses 1=Sunday)
         hour,
         minute,
         repeats: true,
       } as Notifications.CalendarTriggerInput,
     });
   } else {
-    // first fire next Monday
+    // Android: Schedule for next Monday
     const secondsUntilMonday = getSecondsUntilMonday(hour, minute);
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -232,8 +241,8 @@ export async function scheduleWeeklySummary(enabled: boolean, hour: number = 9, 
         repeats: false,
       },
     });
-
-    // then repeat weekly
+    
+    // Schedule repeating weekly notification
     await Notifications.scheduleNotificationAsync({
       content: {
         title: '📊 Weekly Summary',
@@ -251,7 +260,7 @@ export async function scheduleWeeklySummary(enabled: boolean, hour: number = 9, 
   }
 }
 
-// ===== Conditional alerts (low balance / large tx) =====
+// Trigger balance or transaction alerts
 export async function maybeTriggerThresholdAlerts(newTx?: Transaction) {
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
@@ -260,7 +269,7 @@ export async function maybeTriggerThresholdAlerts(newTx?: Transaction) {
   if (!raw) return;
   const settings = JSON.parse(raw);
 
-  // Low balance
+  // Low balance alert
   if (settings.lowBalance) {
     const stats = await getTransactionStats();
     const balance = stats.totalIncome - stats.totalExpense;
@@ -276,7 +285,7 @@ export async function maybeTriggerThresholdAlerts(newTx?: Transaction) {
     }
   }
 
-  // Large transaction
+  // Large transaction alert
   if (settings.largeTx && newTx && newTx.amount >= settings.largeTxThreshold) {
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -289,43 +298,83 @@ export async function maybeTriggerThresholdAlerts(newTx?: Transaction) {
   }
 }
 
-// ===== Budget threshold crossings (75/90/100%) =====
+// Budget threshold alerts
 export async function notifyBudgetThreshold(percentage: number, spent: number, total: number) {
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
-  if (percentage < 75) return;
-
-  const meta =
-    percentage >= 100
-      ? { emoji: '🚨', title: 'Budget Exceeded!' }
-      : percentage >= 90
-      ? { emoji: '⚠️', title: 'Nearly at Limit!' }
-      : { emoji: '💡', title: 'Spending Alert' };
+  let title = '';
+  let emoji = '';
+  
+  if (percentage >= 100) {
+    emoji = '🚨';
+    title = 'Budget Exceeded!';
+  } else if (percentage >= 90) {
+    emoji = '⚠️';
+    title = 'Nearly at Limit!';
+  } else if (percentage >= 75) {
+    emoji = '💡';
+    title = 'Spending Alert';
+  } else {
+    return; // Don't notify below 75%
+  }
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: `${meta.emoji} ${meta.title}`,
-      body: `You've spent ${percentage.toFixed(0)}% of your monthly allowance ($${spent.toFixed(
-        2
-      )} / $${total.toFixed(2)})`,
+      title: `${emoji} ${title}`,
+      body: `You've spent ${percentage.toFixed(0)}% of your monthly allowance ($${spent.toFixed(2)} / $${total.toFixed(2)})`,
       data: { type: 'budget_alert', percentage },
     },
     trigger: null,
   });
 }
 
-// ===== Utilities =====
+// Get all scheduled and delivered notifications
 export async function getAllNotifications() {
   const delivered = await Notifications.getPresentedNotificationsAsync();
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   return { delivered, scheduled };
 }
 
+// Clear all notifications
 export async function clearAllNotifications() {
   await Notifications.dismissAllNotificationsAsync();
 }
 
+// Cancel all scheduled notifications
 export async function cancelAllScheduledNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+// ✅ Schedule a one-time reminder notification (used by HomeScreen)
+export async function scheduleReminderNotification(fireDate: Date, message: string) {
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) return;
+
+    // ✅ Use Expo enum for type safety
+    const trigger: Notifications.CalendarTriggerInput = {
+      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+      year: fireDate.getFullYear(),
+      month: fireDate.getMonth() + 1, // months are 0-indexed
+      day: fireDate.getDate(),
+      hour: fireDate.getHours(),
+      minute: fireDate.getMinutes(),
+      second: fireDate.getSeconds(),
+      repeats: false,
+    };
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '⏰ Reminder',
+        body: message,
+        data: { type: 'reminder', fireDate: fireDate.toISOString() },
+      },
+      trigger,
+    });
+
+    console.log(`[scheduleReminderNotification] Reminder set for ${fireDate.toISOString()}`);
+  } catch (error: any) {
+    console.error('[scheduleReminderNotification] Error scheduling reminder:', error);
+  }
 }

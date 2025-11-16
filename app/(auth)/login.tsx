@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   View, 
@@ -71,12 +72,22 @@ export default function LoginScreen() {
                 <TextInput
                   placeholder="Email or Username"
                   value={emailOrUsername}
-                  onChangeText={setEmailOrUsername}
+                  onChangeText={(text) => {
+                    if (text.length <= 100) {
+                      setEmailOrUsername(text);
+                      if (text.length === 100) {
+                        Alert.alert('Character Limit Reached', 'Email or username cannot exceed 100 characters');
+                      }
+                    } else {
+                      Alert.alert('Input Too Long', 'Email or username must be 100 characters or less');
+                    }
+                  }}
                   style={styles.input}
                   placeholderTextColor="#999"
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading}
+                  maxLength={100}
                 />
               </View>
 
@@ -84,13 +95,30 @@ export default function LoginScreen() {
                 <TextInput
                   placeholder="Password"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => {
+                    if (text.length <= 32) {
+                      setPassword(text);
+                      if (text.length === 32) {
+                        Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                      }
+                    } else {
+                      Alert.alert('Password Too Long', 'Password must be 32 characters or less');
+                    }
+                  }}
                   secureTextEntry
                   style={styles.input}
                   placeholderTextColor="#999"
                   editable={!loading}
+                  maxLength={32}
                 />
               </View>
+
+              <TouchableOpacity 
+                onPress={() => router.push('/(auth)/forgot-password')}
+                style={{ alignSelf: 'flex-end', marginTop: 8 }}
+              >
+                <Text style={{ color: '#2196F3', fontSize: 14 }}>Forgot Password?</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.loginButton, loading && styles.loginButtonDisabled]} 

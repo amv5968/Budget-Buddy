@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-    Animated,
-    Dimensions,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -26,19 +26,11 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
   React.useEffect(() => {
-    if (visible) {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: -SIDEBAR_WIDTH,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
+    Animated.timing(slideAnim, {
+      toValue: visible ? 0 : -SIDEBAR_WIDTH,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   }, [visible]);
 
   const handleNavigation = (route: string) => {
@@ -48,6 +40,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
     }, 300);
   };
 
+  // Sidebar menu items
   const menuItems = [
     {
       id: 'ai-assistant',
@@ -57,122 +50,64 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       route: '/(tabs)/ai-assistant',
     },
     {
+    id: 'calendar',
+    title: 'Calendar',
+    icon: '📅',
+    description: 'View spending by date',
+    route: '/calendar',         
+    },
+    {
+   id: 'expense-breakdown',
+   title: 'Expense Breakdown',
+   icon: '📊',
+   description: 'View your spending by category',
+   route: '/expense-breakdown',
+   },
+    {
+      id: 'connected-accounts',
+      title: 'Connected Accounts',
+      icon: '🏦',
+      description: 'Link your banks and credit cards',
+      route: '/connected-accounts',
+    },
+    {
+      id: 'recurring-transactions',
+      title: 'Recurring Transactions',
+      icon: '🔄',
+      description: 'Manage automatic recurring payments',
+      route: '/recurring-transactions',
+    },
+    {
+      id: 'subscriptions',
+      title: 'Subscriptions',
+      icon: '💳',
+      description: 'Track your recurring payments',
+      route: '/subscriptions',
+    },
+    {
       id: 'resources',
       title: 'Resources',
       icon: '📘',
       description: 'Financial education and tools',
       route: '/(tabs)/resources',
-    },
+    }
   ];
 
-  const styles = StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    sidebar: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      bottom: 0,
-      width: SIDEBAR_WIDTH,
-      backgroundColor: colors.cardBackground,
-      shadowColor: '#000',
-      shadowOffset: { width: 2, height: 0 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
-    },
-    header: {
-      paddingTop: 60,
-      paddingHorizontal: 20,
-      paddingBottom: 20,
-      backgroundColor: colors.primary,
-    },
-    closeButton: {
-      position: 'absolute',
-      top: 55,
-      right: 15,
-      zIndex: 10,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: '#fff',
-      marginBottom: 3,
-    },
-    headerSubtitle: {
-      fontSize: 13,
-      color: 'rgba(255, 255, 255, 0.8)',
-    },
-    menuContainer: {
-      flex: 1,
-      paddingTop: 10,
-    },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 16,
-      paddingHorizontal: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    menuIcon: {
-      fontSize: 24,
-      marginRight: 12,
-      width: 30,
-      textAlign: 'center',
-    },
-    menuTextContainer: {
-      flex: 1,
-    },
-    menuTitle: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 3,
-    },
-    menuDescription: {
-      fontSize: 11,
-      color: colors.textSecondary,
-    },
-    menuArrow: {
-      marginLeft: 10,
-    },
-    footer: {
-      padding: 16,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    footerText: {
-      fontSize: 11,
-      color: colors.textSecondary,
-      textAlign: 'center',
-    },
-  });
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <Animated.View
           style={[
             styles.sidebar,
             {
+              backgroundColor: colors.cardBackground,
               transform: [{ translateX: slideAnim }],
             },
           ]}
           onStartShouldSetResponder={() => true}
         >
-          <View style={styles.header}>
+          {/* HEADER */}
+          <View style={[styles.header, { backgroundColor: colors.primary }]}>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={28} color="#fff" />
             </TouchableOpacity>
@@ -180,17 +115,23 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
             <Text style={styles.headerSubtitle}>Tools & Resources</Text>
           </View>
 
+          {/* MENU ITEMS */}
           <View style={styles.menuContainer}>
             {menuItems.map((item) => (
               <TouchableOpacity
                 key={item.id}
-                style={styles.menuItem}
+                style={[
+                  styles.menuItem,
+                  { borderBottomColor: colors.border },
+                ]}
                 onPress={() => handleNavigation(item.route)}
               >
                 <Text style={styles.menuIcon}>{item.icon}</Text>
                 <View style={styles.menuTextContainer}>
-                  <Text style={styles.menuTitle}>{item.title}</Text>
-                  <Text style={styles.menuDescription}>{item.description}</Text>
+                  <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
+                    {item.description}
+                  </Text>
                 </View>
                 <Ionicons
                   name="chevron-forward"
@@ -202,11 +143,66 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
             ))}
           </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Budget Buddy v1.0</Text>
+          {/* FOOTER */}
+          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+              Budget Buddy v1.0
+            </Text>
           </View>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sidebar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: SIDEBAR_WIDTH,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 55,
+    right: 15,
+    zIndex: 10,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 3,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  menuContainer: { flex: 1, paddingTop: 10 },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+  },
+  menuIcon: { fontSize: 24, marginRight: 12, width: 30, textAlign: 'center' },
+  menuTextContainer: { flex: 1 },
+  menuTitle: { fontSize: 15, fontWeight: '600' },
+  menuDescription: { fontSize: 11 },
+  menuArrow: { marginLeft: 10 },
+  footer: { padding: 16, borderTopWidth: 1 },
+  footerText: { fontSize: 11, textAlign: 'center' },
+});

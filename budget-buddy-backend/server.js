@@ -9,8 +9,8 @@ const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
 const goalRoutes = require('./routes/goals');
-// <-- CommonJS require
-const remindersRouter = require('./routes/reminders.routes'); 
+const remindersRouter = require('./routes/reminders.routes'); // <-- CommonJS require
+
 dotenv.config();
 
 const app = express();
@@ -24,8 +24,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/goals', goalRoutes);
-app.use('/api/reminders', remindersRouter); 
+app.use('/api/reminders', remindersRouter); // <-- mount reminders API
 app.use('/api/users', usersRoutes);
+app.use('/api/subscriptions', require('./routes/subscriptions.routes'));
 
 // health check
 app.get('/api/health', (req, res) => {
