@@ -148,7 +148,20 @@ export default function AddGoalScreen() {
           style={styles.amountInput}
           placeholder="0.00"
           value={targetAmount}
-          onChangeText={setTargetAmount}
+          onChangeText={(text) => {
+          //Remove EVERYTHING except digits and decimal point
+          let cleaned = text.replace(/[^0-9.]/g, '');
+          //Make sure only ONE decimal point exists
+          const parts = cleaned.split('.');
+            if (parts.length > 2) {
+          cleaned = parts[0] + '.' + parts.slice(1).join('');}
+          //Format with commas (only integer part receives commas)
+          let [integerPart, decimalPart] = cleaned.split('.');
+            if (integerPart) {
+          integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');}
+          const formatted = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
+          setTargetAmount(formatted);
+            }}
           keyboardType="decimal-pad"
           placeholderTextColor="#999"
         />

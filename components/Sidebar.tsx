@@ -18,9 +18,10 @@ const SIDEBAR_WIDTH = Math.min(SCREEN_WIDTH * 0.7, 280);
 interface SidebarProps {
   visible: boolean;
   onClose: () => void;
+  onShowTutorial?: () => void;
 }
 
-export default function Sidebar({ visible, onClose }: SidebarProps) {
+export default function Sidebar({ visible, onClose , onShowTutorial }: SidebarProps) {
   const { colors } = useTheme();
   const router = useRouter();
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
@@ -116,32 +117,61 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
           </View>
 
           {/* MENU ITEMS */}
-          <View style={styles.menuContainer}>
-            {menuItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.menuItem,
-                  { borderBottomColor: colors.border },
-                ]}
-                onPress={() => handleNavigation(item.route)}
-              >
-                <Text style={styles.menuIcon}>{item.icon}</Text>
-                <View style={styles.menuTextContainer}>
-                  <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
-                  <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
-                    {item.description}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.textSecondary}
-                  style={styles.menuArrow}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
+<View style={styles.menuContainer}>
+  {menuItems.map((item) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.menuItem,
+        { borderBottomColor: colors.border },
+      ]}
+      onPress={() => handleNavigation(item.route)}
+    >
+      <Text style={styles.menuIcon}>{item.icon}</Text>
+      <View style={styles.menuTextContainer}>
+        <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
+        <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
+          {item.description}
+        </Text>
+      </View>
+      <Ionicons
+        name="chevron-forward"
+        size={20}
+        color={colors.textSecondary}
+        style={styles.menuArrow}
+      />
+    </TouchableOpacity>
+  ))}
+
+  {/* Show App Tutorial */}
+  {onShowTutorial && (
+    <TouchableOpacity
+      style={[
+        styles.menuItem,
+        { borderBottomColor: colors.border },
+      ]}
+      onPress={() => {
+        onClose();
+        onShowTutorial();
+      }}
+    >
+      <Ionicons
+        name="sparkles-outline"
+        size={22}
+        color={colors.text}
+        style={{ marginRight: 12, width: 30, textAlign: 'center' }}
+      />
+      <View style={styles.menuTextContainer}>
+        <Text style={[styles.menuTitle, { color: colors.text }]}>
+          Tutorial
+        </Text>
+        <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
+          Replay the quick app tour
+        </Text>
+      </View>
+    </TouchableOpacity>
+  )}
+</View>
 
           {/* FOOTER */}
           <View style={[styles.footer, { borderTopColor: colors.border }]}>

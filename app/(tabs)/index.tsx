@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import TutorialModal from '../../components/TutorialModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,25 +52,28 @@ export default function HomeScreen() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
 
-  // --- ui / fetch state ---
+  // ui / fetch state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedChartType, setSelectedChartType] = useState<'pie' | 'line' | 'bar'>('pie');
 
-  // --- calendar state ---
+  // calendar state
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedDateTransactions, setSelectedDateTransactions] = useState<Transaction[]>([]);
   const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
 
-  // --- allowance state ---
+  // allowance state
   const [monthlyAllowance, setMonthlyAllowance] = useState(0);
   const [isAllowanceModalVisible, setIsAllowanceModalVisible] = useState(false);
   const [tempAllowance, setTempAllowance] = useState('0');
 
-  // --- sidebar ---
+  // tutorial 
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // sidebar
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
 
-  // --- reminders UI state ---
+  // reminders UI state
   const [isAddReminderVisible, setIsAddReminderVisible] = useState(false);
   const [newReminderTime, setNewReminderTime] = useState('09:00'); // 'HH:MM'
   const [newReminderMessage, setNewReminderMessage] = useState('');
@@ -77,11 +82,11 @@ export default function HomeScreen() {
     Record<string, { time: string; message: string }[]>
   >({});
 
-  // --- pie chart interactivity ---
+  // pie chart interactivity
   const [selectedCategory, setSelectedCategory] = useState<{ name: string; amount: number; percentage: number } | null>(null);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
 
-  // --- derived allowance stats (used in UI) ---
+  // derived allowance stats (used in UI)
   const remaining = monthlyAllowance - totalExpense;
   const spentPercentage = monthlyAllowance > 0 ? (totalExpense / monthlyAllowance) * 100 : 0;
 
@@ -90,10 +95,27 @@ export default function HomeScreen() {
     requestNotificationPermissions();
   }, []);
 
+  
+  useEffect(() => {
+  const checkTutorial = async () => {
+    try {
+      const seen = await AsyncStorage.getItem('hasSeenTutorial');
+      if (!seen) {
+        setShowTutorial(true);   // first time -> show modal
+      }
+    } catch (err) {
+      console.warn('Error reading tutorial flag:', err);
+      // if read fails, we just don’t show it automatically
+    }
+  };
+
+  checkTutorial();
+}, []);
+
   // Track last alert threshold to avoid duplicate alerts
   const lastAlertPercentage = useRef(0);
 
-  // --- helper: load all reminders and index by date ---
+  // helper: load all reminders and index by date
   const loadAllRemindersForCalendar = async () => {
     try {
       const list: { date: string; time: string; message: string }[] = await getReminders();
@@ -261,6 +283,16 @@ export default function HomeScreen() {
       );
     }
   };
+
+  const handleCloseTutorial = async () => {
+  setShowTutorial(false);
+  try {
+    await AsyncStorage.setItem('hasSeenTutorial', 'true');
+  } catch (err) {
+    console.warn('Error saving tutorial flag:', err);
+  }
+};
+
 
   const handleDateSelect = async (day: { dateString: string }) => {
     setSelectedDate(day.dateString);
@@ -1422,31 +1454,32 @@ export default function HomeScreen() {
         {/* Bar Chart - Income vs Expenses */}
         {selectedChartType === 'bar' && (
           <BarChart
-            data={{
-              labels: incomeVsExpensesData.labels,
-              datasets: [{ data: incomeVsExpensesData.data.length > 0 ? incomeVsExpensesData.data : [0, 0] }],
-            }}
-            width={screenWidth - 72}
-            height={220}
-            yAxisLabel="$"
-            yAxisSuffix=""
-            chartConfig={{
-              backgroundColor: colors.cardBackground,
-              backgroundGradientFrom: colors.cardBackground,
-              backgroundGradientTo: colors.cardBackground,
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(102, 187, 106, ${opacity})`,
-              labelColor: (opacity = 1) => colors.text,
-              style: { borderRadius: 16 },
-              barPercentage: 0.7,
-            }}
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-            }}
-            showValuesOnTopOfBars
-            fromZero
-          />
+  data={{
+    labels: incomeVsExpensesData.labels,
+    datasets: [{ data: incomeVsExpensesData.data.length > 0 ? incomeVsExpensesData.data : [0, 0] }],
+  }}
+  width={screenWidth - 72}
+  height={220}
+  yAxisLabel="$"
+  yAxisSuffix=""   // 👈 add this line
+  chartConfig={{
+    backgroundColor: colors.cardBackground,
+    backgroundGradientFrom: colors.cardBackground,
+    backgroundGradientTo: colors.cardBackground,
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(102, 187, 106, ${opacity})`,
+    labelColor: () => colors.text,
+    style: { borderRadius: 16 },
+    barPercentage: 0.7,
+  }}
+  style={{
+    marginVertical: 8,
+    borderRadius: 16,
+  }}
+  showValuesOnTopOfBars
+  fromZero
+/>
+
         )}
       </View>
 
@@ -1803,9 +1836,18 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+{showTutorial && (
+  <TutorialModal
+    visible={showTutorial}
+    onClose={handleCloseTutorial}
+  />
 
-      {/* Sidebar */}
-      <Sidebar visible={isSidebarVisible} onClose={() => setIsSidebarVisible(false)} />
+)}
+    <Sidebar
+  visible={isSidebarVisible}
+  onClose={() => setIsSidebarVisible(false)}
+  onShowTutorial={() => setShowTutorial(true)}
+/>
     </ScrollView>
   );
 }
