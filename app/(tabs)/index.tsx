@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -29,6 +30,11 @@ import {
 import { addReminder, getReminders, getRemindersForDate } from '../services/reminderService';
 
 import { Budget, getBudgets } from '../services/budgetService';
+import {
+  DashboardPreferences,
+  getDashboardPreferences,
+  saveDashboardPreferences,
+} from '../services/dashboardPreferencesService';
 import { getGoals, Goal } from '../services/goalService';
 import {
   getTransactions,
@@ -82,6 +88,19 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<{ name: string; amount: number; percentage: number } | null>(null);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
 
+  // --- dashboard customization ---
+  const [dashboardPrefs, setDashboardPrefs] = useState<DashboardPreferences>({
+    showSummary: true,
+    showAllowance: true,
+    showCharts: true,
+    showCalendar: true,
+    showTransactions: true,
+    showGoals: true,
+    showBudgets: true,
+  });
+  const [isCustomizeModalVisible, setIsCustomizeModalVisible] = useState(false);
+  const [tempPrefs, setTempPrefs] = useState<DashboardPreferences>(dashboardPrefs);
+
   // --- derived allowance stats (used in UI) ---
   const remaining = monthlyAllowance - totalExpense;
   const spentPercentage = monthlyAllowance > 0 ? (totalExpense / monthlyAllowance) * 100 : 0;
@@ -89,6 +108,20 @@ export default function HomeScreen() {
   // Request OS notification permission on mount
   useEffect(() => {
     requestNotificationPermissions();
+  }, []);
+
+  // Load dashboard preferences on mount
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const prefs = await getDashboardPreferences();
+        setDashboardPrefs(prefs);
+        setTempPrefs(prefs);
+      } catch (error) {
+        console.error('Error loading dashboard preferences:', error);
+      }
+    };
+    loadPreferences();
   }, []);
 
   // Track last alert threshold to avoid duplicate alerts
@@ -173,6 +206,35 @@ export default function HomeScreen() {
       const amount = parseFloat(tempAllowance);
       if (isNaN(amount) || amount <= 0) {
         Alert.alert('Invalid Amount', 'Please enter a valid amount');
+        return;
+      }
+
+      // Check if user has any income first
+      if (totalIncome <= 0) {
+        Alert.alert(
+          '⚠️ No Income Added',
+          'You need to add income transactions before setting a monthly allowance.\n\nPlease add your income first, then set your budget.',
+          [
+            { text: 'OK', style: 'cancel' },
+            { 
+              text: 'Add Income', 
+              onPress: () => {
+                setIsAllowanceModalVisible(false);
+                router.push('/(tabs)/add-transaction?returnTo=/(tabs)');
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Check if allowance exceeds income
+      if (amount > totalIncome) {
+        Alert.alert(
+          '⚠️ Budget Exceeds Income',
+          `Your monthly allowance ($${amount.toFixed(2)}) cannot be more than your total income ($${totalIncome.toFixed(2)}).\n\nPlease set a budget within your income range.`,
+          [{ text: 'OK' }]
+        );
         return;
       }
 
@@ -403,6 +465,42 @@ export default function HomeScreen() {
         },
       },
     ]);
+  };
+
+  const handleToggleSection = (section: keyof DashboardPreferences) => {
+    const newPrefs = { ...tempPrefs, [section]: !tempPrefs[section] };
+    
+    // Count how many sections are enabled
+    const enabledCount = Object.values(newPrefs).filter(Boolean).length;
+    
+    // Prevent disabling the last section
+    if (enabledCount === 0) {
+      Alert.alert(
+        'Minimum Required',
+        'You must keep at least one section visible on your dashboard.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    setTempPrefs(newPrefs);
+  };
+
+  const handleSaveCustomization = async () => {
+    try {
+      await saveDashboardPreferences(tempPrefs);
+      setDashboardPrefs(tempPrefs);
+      setIsCustomizeModalVisible(false);
+      Alert.alert('✅ Success', 'Dashboard customization saved!');
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      Alert.alert('Error', 'Failed to save customization. Please try again.');
+    }
+  };
+
+  const handleCancelCustomization = () => {
+    setTempPrefs(dashboardPrefs);
+    setIsCustomizeModalVisible(false);
   };
 
   const getIconForCategory = (category: string) => {
@@ -1146,6 +1244,84 @@ export default function HomeScreen() {
       fontWeight: 'bold',
       marginLeft: 8,
     },
+
+    customizeButtonContainer: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: colors.cardBackground,
+      alignItems: 'flex-end',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    customizeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 10,
+      gap: 8,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    customizeButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+
+    customizeModalContent: {
+      width: '90%',
+      maxHeight: '80%',
+      borderRadius: 16,
+      padding: 24,
+      elevation: 5,
+      backgroundColor: colors.cardBackground,
+    },
+    customizeSection: {
+      marginBottom: 8,
+    },
+    customizeItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      marginBottom: 8,
+      backgroundColor: colors.background,
+    },
+    customizeItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    customizeItemIcon: {
+      fontSize: 24,
+      marginRight: 12,
+    },
+    customizeItemText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    toggleSwitch: {
+      marginLeft: 12,
+    },
+    customizeFooter: {
+      marginTop: 16,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    customizeFooterText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
   });
 
   if (loading) {
@@ -1184,101 +1360,148 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.summaryContainer}>
-        <View style={[styles.summaryBox, styles.incomeBox]}>
-          <Text style={styles.summaryLabel}>Income</Text>
-          <Text style={styles.incomeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-            ${totalIncome.toFixed(2)}
-          </Text>
-        </View>
-        <View style={[styles.summaryBox, styles.expenseBox]}>
-          <Text style={styles.summaryLabel}>Expenses</Text>
-          <Text style={styles.expenseText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-            ${totalExpense.toFixed(2)}
-          </Text>
-        </View>
-        <View style={[styles.summaryBox, styles.balanceBox]}>
-          <Text style={styles.summaryLabel}>Balance</Text>
-          <Text
-            style={[
-              styles.balanceText,
-              {
-                color: totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336',
-              },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}
-          >
-            ${(totalIncome - totalExpense).toFixed(2)}
-          </Text>
-        </View>
+      {/* Customization Button below profile */}
+      <View style={styles.customizeButtonContainer}>
+        <TouchableOpacity 
+          style={styles.customizeButton}
+          onPress={() => {
+            setTempPrefs(dashboardPrefs);
+            setIsCustomizeModalVisible(true);
+          }}
+        >
+          <Ionicons name="options-outline" size={20} color="#fff" />
+          <Text style={styles.customizeButtonText}>Customize Dashboard</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.allowanceCard}
-        onPress={() => {
-          setTempAllowance(monthlyAllowance.toString());
-          setIsAllowanceModalVisible(true);
-        }}
-      >
-        <View style={styles.allowanceHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>🎓 Monthly Allowance</Text>
-            <View className="status-badge" style={styles.statusBadge}>
-              <Text style={[styles.statusBadgeText, { color: getAllowanceStatus().color }]}>
-                {getAllowanceStatus().emoji} {getAllowanceStatus().text}
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="pencil" size={20} color={colors.primary} />
-        </View>
-
-        <View style={styles.allowanceRow}>
-          <View style={styles.allowanceColumn}>
-            <Text style={styles.fieldLabel}>Budget</Text>
-            <Text style={[styles.allowanceAmount, { color: colors.text }]}>
-              ${monthlyAllowance.toFixed(2)}
+      {dashboardPrefs.showSummary && (
+        <View style={styles.summaryContainer}>
+          <View style={[styles.summaryBox, styles.incomeBox]}>
+            <Text style={styles.summaryLabel}>Income</Text>
+            <Text style={styles.incomeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              ${totalIncome.toFixed(2)}
             </Text>
           </View>
-          <View style={styles.allowanceColumn}>
-            <Text style={styles.fieldLabel}>Spent</Text>
-            <Text style={[styles.allowanceAmount, { color: colors.expense }]}>
+          <View style={[styles.summaryBox, styles.expenseBox]}>
+            <Text style={styles.summaryLabel}>Expenses</Text>
+            <Text style={styles.expenseText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
               ${totalExpense.toFixed(2)}
             </Text>
           </View>
-          <View style={styles.allowanceColumn}>
-            <Text style={styles.fieldLabel}>Remaining</Text>
+          <View style={[styles.summaryBox, styles.balanceBox]}>
+            <Text style={styles.summaryLabel}>Balance</Text>
             <Text
               style={[
-                styles.allowanceAmount,
-                { color: remaining >= 0 ? colors.income : colors.danger, fontWeight: 'bold' },
+                styles.balanceText,
+                {
+                  color: totalIncome - totalExpense >= 0 ? '#4CAF50' : '#F44336',
+                },
               ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
             >
-              ${remaining >= 0 ? remaining.toFixed(2) : '0.00'}
+              ${(totalIncome - totalExpense).toFixed(2)}
             </Text>
           </View>
         </View>
+      )}
 
-        <View style={styles.progressBarBackground}>
-          <View
-            style={[
-              styles.progressBarFill,
-              {
-                width: `${Math.min(spentPercentage, 100)}%`,
-                backgroundColor: getProgressBarColor(),
-              },
-            ]}
-          />
-        </View>
+      {dashboardPrefs.showAllowance && (
+        <TouchableOpacity
+          style={styles.allowanceCard}
+          onPress={() => {
+            if (totalIncome <= 0) {
+              Alert.alert(
+                '⚠️ No Income Added',
+                'You need to add income transactions before setting a monthly allowance.\n\nPlease add your income first, then set your budget.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Add Income', 
+                    onPress: () => router.push('/(tabs)/add-transaction?returnTo=/(tabs)')
+                  }
+                ]
+              );
+              return;
+            }
+            setTempAllowance(monthlyAllowance.toString());
+            setIsAllowanceModalVisible(true);
+          }}
+        >
+          <View style={styles.allowanceHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>🎓 Monthly Allowance</Text>
+              {totalIncome <= 0 ? (
+                <View className="status-badge" style={[styles.statusBadge, { backgroundColor: colors.warning + '20' }]}>
+                  <Text style={[styles.statusBadgeText, { color: colors.warning }]}>
+                    ⚠️ Add Income First
+                  </Text>
+                </View>
+              ) : (
+                <View className="status-badge" style={styles.statusBadge}>
+                  <Text style={[styles.statusBadgeText, { color: getAllowanceStatus().color }]}>
+                    {getAllowanceStatus().emoji} {getAllowanceStatus().text}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Ionicons name="pencil" size={20} color={totalIncome <= 0 ? colors.textSecondary : colors.primary} />
+          </View>
 
-        <Text style={[styles.percentageText, { color: colors.textSecondary }]}>
-          {spentPercentage.toFixed(1)}% of budget used
-        </Text>
-      </TouchableOpacity>
+          <View style={styles.allowanceRow}>
+            <View style={styles.allowanceColumn}>
+              <Text style={styles.fieldLabel}>Budget</Text>
+              <Text style={[styles.allowanceAmount, { color: colors.text }]}>
+                ${monthlyAllowance.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.allowanceColumn}>
+              <Text style={styles.fieldLabel}>Spent</Text>
+              <Text style={[styles.allowanceAmount, { color: colors.expense }]}>
+                ${totalExpense.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.allowanceColumn}>
+              <Text style={styles.fieldLabel}>Remaining</Text>
+              <Text
+                style={[
+                  styles.allowanceAmount,
+                  { color: remaining >= 0 ? colors.income : colors.danger, fontWeight: 'bold' },
+                ]}
+              >
+                ${remaining >= 0 ? remaining.toFixed(2) : '0.00'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.progressBarBackground}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${Math.min(spentPercentage, 100)}%`,
+                  backgroundColor: getProgressBarColor(),
+                },
+              ]}
+            />
+          </View>
+
+          {totalIncome <= 0 ? (
+            <Text style={[styles.percentageText, { color: colors.warning, fontWeight: '600' }]}>
+              ⚠️ Tap to add income and set your budget
+            </Text>
+          ) : (
+            <Text style={[styles.percentageText, { color: colors.textSecondary }]}>
+              {spentPercentage.toFixed(1)}% of budget used
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Charts Section with Type Selector */}
-      <View style={styles.chartCard}>
+      {dashboardPrefs.showCharts && (
+        <View style={styles.chartCard}>
         <View style={styles.chartHeader}>
           <Text style={[styles.sectionTitle, { flex: 1, flexShrink: 1 }]}>
             {selectedChartType === 'pie' && '📊 Expense Breakdown'}
@@ -1446,9 +1669,11 @@ export default function HomeScreen() {
             fromZero
           />
         )}
-      </View>
+        </View>
+      )}
 
-      <View style={styles.calendarSection}>
+      {dashboardPrefs.showCalendar && (
+        <View style={styles.calendarSection}>
         <Text style={styles.sectionTitle}>📅 Calendar</Text>
         <Text style={styles.calendarSubtitle}>Tap a date to view transactions • Dots indicate activity</Text>
 
@@ -1482,11 +1707,14 @@ export default function HomeScreen() {
             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Reminder</Text>
           </View>
         </View>
-      </View>
+        </View>
+      )}
 
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Recent Transactions</Text>
-      </View>
+      {dashboardPrefs.showTransactions && (
+        <>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          </View>
 
       {transactions.length === 0 ? (
         <View style={styles.emptyState}>
@@ -1529,11 +1757,15 @@ export default function HomeScreen() {
           ))}
         </View>
       )}
+        </>
+      )}
 
       {/* Recent Goals Section */}
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Recent Goals</Text>
-      </View>
+      {dashboardPrefs.showGoals && (
+        <>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>Recent Goals</Text>
+          </View>
 
       {goals.length === 0 ? (
         <View style={styles.emptyState}>
@@ -1575,11 +1807,15 @@ export default function HomeScreen() {
           })}
         </View>
       )}
+        </>
+      )}
 
       {/* Recent Budgets Section */}
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Recent Budgets</Text>
-      </View>
+      {dashboardPrefs.showBudgets && (
+        <>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>Recent Budgets</Text>
+          </View>
 
       {budgets.length === 0 ? (
         <View style={styles.emptyState}>
@@ -1625,6 +1861,8 @@ export default function HomeScreen() {
           })}
         </View>
       )}
+        </>
+      )}
 
       {/* Allowance modal */}
       <Modal
@@ -1636,7 +1874,20 @@ export default function HomeScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit Monthly Allowance</Text>
-            <Text style={styles.modalSubtitle}>Set your monthly budget limit</Text>
+            {totalIncome > 0 ? (
+              <>
+                <Text style={styles.modalSubtitle}>
+                  Set your monthly budget limit (Max: $${totalIncome.toFixed(2)})
+                </Text>
+                <Text style={[styles.modalSubtitle, { fontSize: 12, marginTop: -12, marginBottom: 8, color: colors.textSecondary }]}>
+                  💡 Your allowance cannot exceed your total income
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.modalSubtitle}>
+                Add income transactions first to set your budget
+              </Text>
+            )}
             <TextInput
               style={styles.modalInput}
               placeholder="$0.00"
@@ -1837,6 +2088,165 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Dashboard Customization Modal */}
+      <Modal
+        visible={isCustomizeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCancelCustomization}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.customizeModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Customize Dashboard</Text>
+              <TouchableOpacity onPress={handleCancelCustomization}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Choose which sections to display on your dashboard
+            </Text>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              <View style={styles.customizeSection}>
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showSummary')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>📊</Text>
+                    <Text style={styles.customizeItemText}>Summary</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showSummary}
+                    onValueChange={() => handleToggleSection('showSummary')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showSummary ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showAllowance')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>🎓</Text>
+                    <Text style={styles.customizeItemText}>Monthly Allowance</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showAllowance}
+                    onValueChange={() => handleToggleSection('showAllowance')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showAllowance ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showCharts')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>📈</Text>
+                    <Text style={styles.customizeItemText}>Charts</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showCharts}
+                    onValueChange={() => handleToggleSection('showCharts')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showCharts ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showCalendar')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>📅</Text>
+                    <Text style={styles.customizeItemText}>Calendar</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showCalendar}
+                    onValueChange={() => handleToggleSection('showCalendar')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showCalendar ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showTransactions')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>💸</Text>
+                    <Text style={styles.customizeItemText}>Recent Transactions</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showTransactions}
+                    onValueChange={() => handleToggleSection('showTransactions')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showTransactions ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showGoals')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>🎯</Text>
+                    <Text style={styles.customizeItemText}>Recent Goals</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showGoals}
+                    onValueChange={() => handleToggleSection('showGoals')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showGoals ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showBudgets')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>💰</Text>
+                    <Text style={styles.customizeItemText}>Recent Budgets</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showBudgets}
+                    onValueChange={() => handleToggleSection('showBudgets')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showBudgets ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            <View style={styles.customizeFooter}>
+              <Text style={styles.customizeFooterText}>
+                💡 At least one section must remain visible
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={handleCancelCustomization}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={handleSaveCustomization}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
