@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -30,7 +31,11 @@ const validatePassword = (password: string): { valid: boolean; message: string }
     return { valid: false, message: 'Password must contain at least one uppercase letter' };
   }
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)' };
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)',
+    };
   }
   return { valid: true, message: '' };
 };
@@ -39,11 +44,15 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const tokenFromUrl = params.token as string;
-  
+
   const [token, setToken] = useState(tokenFromUrl || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 👁️ show/hide toggles (same pattern as login/signup)
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleResetPassword = async () => {
     if (!token.trim()) {
@@ -71,20 +80,22 @@ export default function ResetPasswordScreen() {
     setLoading(true);
     try {
       await resetPassword(token.trim(), newPassword);
-      
+
       Alert.alert(
         '✅ Password Reset Successful',
         'Your password has been reset successfully. You can now login with your new password.',
         [
           {
             text: 'Go to Login',
-            onPress: () => router.replace('/(auth)/login')
-          }
+            onPress: () => router.replace('/(auth)/login'),
+          },
         ]
       );
     } catch (error: any) {
       console.error('Password reset error:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to reset password. Please check your token and try again.';
+      const errorMessage =
+        error.response?.data?.error ||
+        'Failed to reset password. Please check your token and try again.';
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
@@ -98,11 +109,11 @@ export default function ResetPasswordScreen() {
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
     >
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -112,10 +123,13 @@ export default function ResetPasswordScreen() {
                 <Text style={styles.logoEmoji}>🔑</Text>
               </View>
               <Text style={styles.appTitle}>Reset Password</Text>
-              <Text style={styles.subtitle}>Enter your reset token and new password</Text>
+              <Text style={styles.subtitle}>
+                Enter your reset token and new password
+              </Text>
             </View>
 
             <View style={styles.inputSection}>
+              {/* Reset token */}
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder="Reset Token"
@@ -129,48 +143,90 @@ export default function ResetPasswordScreen() {
                 />
               </View>
 
+              {/* New password with eye icon */}
               <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="New Password (6-32 chars, requires: A-Z, a-z, special)"
-                  value={newPassword}
-                  onChangeText={(text) => {
-                    if (text.length <= 32) {
-                      setNewPassword(text);
-                      if (text.length === 32) {
-                        Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    placeholder="New Password (6-32 chars, requires: A-Z, a-z, special)"
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      if (text.length <= 32) {
+                        setNewPassword(text);
+                        if (text.length === 32) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Password cannot exceed 32 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Password Too Long',
+                          'Password must be 32 characters or less'
+                        );
                       }
-                    } else {
-                      Alert.alert('Password Too Long', 'Password must be 32 characters or less');
-                    }
-                  }}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                  maxLength={32}
-                />
+                    }}
+                    secureTextEntry={!showNewPassword}
+                    style={[styles.input, { paddingRight: 45 }]}
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    maxLength={32}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setShowNewPassword((prev) => !prev)}
+                    style={styles.eyeButton}
+                    disabled={loading}
+                  >
+                    <Ionicons
+                      name={showNewPassword ? 'eye' : 'eye-off'}
+                      size={22}
+                      color="#555"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
+              {/* Confirm password with eye icon */}
               <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Confirm New Password"
-                  value={confirmPassword}
-                  onChangeText={(text) => {
-                    if (text.length <= 32) {
-                      setConfirmPassword(text);
-                      if (text.length === 32) {
-                        Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    placeholder="Confirm New Password"
+                    value={confirmPassword}
+                    onChangeText={(text) => {
+                      if (text.length <= 32) {
+                        setConfirmPassword(text);
+                        if (text.length === 32) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Password cannot exceed 32 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Password Too Long',
+                          'Password must be 32 characters or less'
+                        );
                       }
-                    } else {
-                      Alert.alert('Password Too Long', 'Password must be 32 characters or less');
-                    }
-                  }}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                  maxLength={32}
-                />
+                    }}
+                    secureTextEntry={!showConfirmPassword}
+                    style={[styles.input, { paddingRight: 45 }]}
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    maxLength={32}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword((prev) => !prev)}
+                    style={styles.eyeButton}
+                    disabled={loading}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? 'eye' : 'eye-off'}
+                      size={22}
+                      color="#555"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.passwordTips}>
@@ -178,11 +234,11 @@ export default function ResetPasswordScreen() {
                 <Text style={styles.tipsText}>• Between 6-32 characters long</Text>
                 <Text style={styles.tipsText}>• At least one lowercase letter (a-z)</Text>
                 <Text style={styles.tipsText}>• At least one uppercase letter (A-Z)</Text>
-                <Text style={styles.tipsText}>• At least one special character </Text>
+                <Text style={styles.tipsText}>• At least one special character</Text>
               </View>
 
-              <TouchableOpacity 
-                style={[styles.resetButton, loading && styles.resetButtonDisabled]} 
+              <TouchableOpacity
+                style={[styles.resetButton, loading && styles.resetButtonDisabled]}
                 onPress={handleResetPassword}
                 activeOpacity={0.8}
                 disabled={loading}
@@ -276,6 +332,15 @@ const styles = StyleSheet.create({
     padding: 18,
     fontSize: 16,
     color: '#333',
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    padding: 6,
   },
   passwordTips: {
     marginTop: 8,

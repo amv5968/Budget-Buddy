@@ -361,7 +361,7 @@ export default function HomeScreen() {
   const getDayStats = () => {
     const income = selectedDateTransactions
       .filter((t) => t.type === 'Income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const expense = selectedDateTransactions
       .filter((t) => t.type === 'Expense')
@@ -438,10 +438,11 @@ export default function HomeScreen() {
     const categoryTotals: { [key: string]: number } = {};
 
     expenseTransactions.forEach((transaction) => {
+      const absAmount = Math.abs(transaction.amount);
       if (categoryTotals[transaction.category]) {
-        categoryTotals[transaction.category] += transaction.amount;
+        categoryTotals[transaction.category] += absAmount;
       } else {
-        categoryTotals[transaction.category] = transaction.amount;
+        categoryTotals[transaction.category] = absAmount;
       }
     });
 
@@ -521,7 +522,7 @@ export default function HomeScreen() {
       const transDate = new Date(t.date);
       if (transDate.getMonth() === currentMonth && transDate.getFullYear() === currentYear) {
         if (t.type === 'Income') {
-          monthIncome += t.amount;
+          monthIncome += Math.abs(t.amount);
         } else {
           monthExpense += Math.abs(t.amount);
         }
@@ -1598,7 +1599,10 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={item._id}
                 style={styles.budgetItem}
-                onPress={() => router.push(`/(tabs)/edit-budget?id=${item._id}&returnTo=/(tabs)`)}
+                onPress={() => {
+                  console.log('Clicking budget from home:', { id: item._id, category: item.category, type: item.type });
+                  router.push(`/(tabs)/edit-budget?id=${item._id}&returnTo=/(tabs)`);
+                }}
               >
                 <View style={styles.budgetLeft}>
                   <View style={styles.iconContainer}>

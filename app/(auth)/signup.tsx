@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -31,7 +32,11 @@ const validatePassword = (password: string): { valid: boolean; message: string }
     return { valid: false, message: 'Password must contain at least one uppercase letter' };
   }
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)' };
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)',
+    };
   }
   return { valid: true, message: '' };
 };
@@ -42,6 +47,11 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 👁️ show/hide states (same idea as login)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const router = useRouter();
   const { login } = useAuth();
 
@@ -55,7 +65,7 @@ export default function SignUpScreen() {
       Alert.alert('Error', 'Username must be at least 3 characters');
       return;
     }
-    
+
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
@@ -96,17 +106,17 @@ export default function SignUpScreen() {
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
     >
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.formContainer}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
+              <View className="logoCircle" style={styles.logoCircle}>
                 <Text style={styles.logoEmoji}>💰</Text>
               </View>
               <Text style={styles.appTitle}>Create Account</Text>
@@ -114,6 +124,7 @@ export default function SignUpScreen() {
             </View>
 
             <View style={styles.inputSection}>
+              {/* Email */}
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder="Email (max 100 characters)"
@@ -122,7 +133,10 @@ export default function SignUpScreen() {
                     if (text.length <= 100) {
                       setEmail(text);
                       if (text.length === 100) {
-                        Alert.alert('Character Limit Reached', 'Email cannot exceed 100 characters');
+                        Alert.alert(
+                          'Character Limit Reached',
+                          'Email cannot exceed 100 characters'
+                        );
                       }
                     } else {
                       Alert.alert('Email Too Long', 'Email must be 100 characters or less');
@@ -137,6 +151,7 @@ export default function SignUpScreen() {
                 />
               </View>
 
+              {/* Username */}
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder="Username (3-30 characters)"
@@ -145,7 +160,10 @@ export default function SignUpScreen() {
                     if (text.length <= 30) {
                       setUsername(text);
                       if (text.length === 30) {
-                        Alert.alert('Character Limit Reached', 'Username cannot exceed 30 characters');
+                        Alert.alert(
+                          'Character Limit Reached',
+                          'Username cannot exceed 30 characters'
+                        );
                       }
                     } else {
                       Alert.alert('Username Too Long', 'Username must be 30 characters or less');
@@ -159,52 +177,94 @@ export default function SignUpScreen() {
                 />
               </View>
 
+              {/* Password with eye icon (same pattern as login) */}
               <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Password (6-32 chars, requires: A-Z, a-z, special)"
-                  value={password}
-                  onChangeText={(text) => {
-                    if (text.length <= 32) {
-                      setPassword(text);
-                      if (text.length === 32) {
-                        Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    placeholder="Password (6-32 chars, requires: A-Z, a-z, special)"
+                    value={password}
+                    onChangeText={(text) => {
+                      if (text.length <= 32) {
+                        setPassword(text);
+                        if (text.length === 32) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Password cannot exceed 32 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Password Too Long',
+                          'Password must be 32 characters or less'
+                        );
                       }
-                    } else {
-                      Alert.alert('Password Too Long', 'Password must be 32 characters or less');
-                    }
-                  }}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                  maxLength={32}
-                />
+                    }}
+                    secureTextEntry={!showPassword}
+                    style={[styles.input, { paddingRight: 45 }]}
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    maxLength={32}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    style={styles.eyeButton}
+                    disabled={loading}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye' : 'eye-off'}
+                      size={22}
+                      color="#555"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
+              {/* Confirm Password with eye icon */}
               <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Confirm Password (max 32 characters)"
-                  value={confirmPassword}
-                  onChangeText={(text) => {
-                    if (text.length <= 32) {
-                      setConfirmPassword(text);
-                      if (text.length === 32) {
-                        Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    placeholder="Confirm Password (max 32 characters)"
+                    value={confirmPassword}
+                    onChangeText={(text) => {
+                      if (text.length <= 32) {
+                        setConfirmPassword(text);
+                        if (text.length === 32) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Password cannot exceed 32 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Password Too Long',
+                          'Password must be 32 characters or less'
+                        );
                       }
-                    } else {
-                      Alert.alert('Password Too Long', 'Password must be 32 characters or less');
-                    }
-                  }}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                  maxLength={32}
-                />
+                    }}
+                    secureTextEntry={!showConfirmPassword}
+                    style={[styles.input, { paddingRight: 45 }]}
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    maxLength={32}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword((prev) => !prev)}
+                    style={styles.eyeButton}
+                    disabled={loading}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? 'eye' : 'eye-off'}
+                      size={22}
+                      color="#555"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              <TouchableOpacity 
-                style={[styles.signupButton, loading && styles.signupButtonDisabled]} 
+              <TouchableOpacity
+                style={[styles.signupButton, loading && styles.signupButtonDisabled]}
                 onPress={handleSignUp}
                 activeOpacity={0.8}
                 disabled={loading}
@@ -297,6 +357,15 @@ const styles = StyleSheet.create({
     padding: 18,
     fontSize: 16,
     color: '#333',
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    padding: 6,
   },
   signupButton: {
     backgroundColor: '#66BB6A',

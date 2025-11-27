@@ -65,7 +65,7 @@ router.get('/stats', auth, async (req, res) => {
     allTransactions.forEach(transaction => {
       console.log(`Transaction: ${transaction.type} - $${transaction.amount}`);
       if (transaction.type === 'Income') {
-        totalIncome += transaction.amount;
+        totalIncome += Math.abs(transaction.amount);
       } else if (transaction.type === 'Expense') {
         totalExpense += Math.abs(transaction.amount);
       }

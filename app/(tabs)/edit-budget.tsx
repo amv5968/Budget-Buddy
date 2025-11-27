@@ -1,26 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { 
+import {
   deleteBudget,
-  getBudgets, 
+  getBudgets,
   updateBudgetSpent,
-  type Budget 
+  type Budget
 } from '../services/budgetService';
 
 export default function EditBudgetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const budgetId = params.id as string;
+
+  console.log('EditBudgetScreen rendered with params:', params);
+  console.log('Extracted budgetId:', budgetId);
 
   const [budget, setBudget] = useState<Budget | null>(null);
   const [spentAmount, setSpentAmount] = useState('');
@@ -30,19 +33,48 @@ export default function EditBudgetScreen() {
 
 
   useEffect(() => {
-    loadBudget();
-  }, []);
+    if (budgetId) {
+      console.log('useEffect triggered with budgetId:', budgetId);
+      loadBudget();
+    }
+  }, [budgetId]);
 
   const loadBudget = async () => {
     try {
+      setLoading(true);
+      console.log('==== LOADING BUDGET ====');
+      console.log('Looking for budget with ID:', budgetId);
+      console.log('ID type:', typeof budgetId);
+      console.log('ID length:', budgetId?.length);
+      
       const budgets = await getBudgets();
-      const foundBudget = budgets.find(b => b._id === budgetId);
+      console.log('Total budgets fetched:', budgets.length);
+      console.log('All budgets:', budgets.map(b => ({ 
+        id: b._id, 
+        category: b.category, 
+        type: b.type,
+        idLength: b._id.length 
+      })));
+      
+      const foundBudget = budgets.find(b => {
+        const match = b._id === budgetId;
+        console.log(`Comparing: "${b._id}" === "${budgetId}" = ${match}`);
+        return match;
+      });
       
       if (foundBudget) {
+        console.log('✅ Found budget:', { 
+          id: foundBudget._id, 
+          category: foundBudget.category, 
+          type: foundBudget.type 
+        });
         setBudget(foundBudget);
         setSpentAmount(foundBudget.spentAmount.toString());
       } else {
-        Alert.alert('Error', 'Budget not found');
+        console.error('❌ Budget not found!');
+        console.error('Looking for ID:', budgetId);
+        console.error('Available IDs:', budgets.map(b => b._id));
+        Alert.alert('Error', `Budget not found.\n\nLooking for: ${budgetId}\n\nAvailable: ${budgets.length} budgets`);
         router.back();
       }
     } catch (error) {
@@ -135,7 +167,24 @@ export default function EditBudgetScreen() {
       <View style={styles.budgetCard}>
         <View style={styles.budgetHeader}>
           <Text style={styles.budgetIcon}>{budget.icon || '💵'}</Text>
-          <Text style={styles.budgetCategory}>{budget.category}</Text>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.budgetCategory}>{budget.category}</Text>
+              {budget.type && (
+                <Text style={[styles.budgetTypeBadge, { 
+                  color: budget.type === 'Income' ? '#4CAF50' : '#F44336',
+                  fontSize: 12,
+                  fontWeight: '600',
+                  backgroundColor: budget.type === 'Income' ? '#E8F5E9' : '#FFEBEE',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 4,
+                }]}>
+                  {budget.type === 'Income' ? '💰 Income' : '💸 Expense'}
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
 
         <View style={styles.budgetInfo}>
@@ -157,13 +206,17 @@ export default function EditBudgetScreen() {
 
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Spent</Text>
+            <Text style={styles.statLabel}>
+              {budget.type === 'Income' ? 'Earned' : 'Spent'}
+            </Text>
             <Text style={[styles.statValue, { color: progressColor }]}>
               ${parseFloat(spentAmount).toFixed(2)}
             </Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Remaining</Text>
+            <Text style={styles.statLabel}>
+              {budget.type === 'Income' ? 'Target' : 'Remaining'}
+            </Text>
             <Text style={styles.statValue}>
               ${(budget.totalAmount - parseFloat(spentAmount || '0')).toFixed(2)}
             </Text>
@@ -178,7 +231,9 @@ export default function EditBudgetScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Update Spent Amount</Text>
+        <Text style={styles.label}>
+          {budget.type === 'Income' ? 'Update Earned Amount' : 'Update Spent Amount'}
+        </Text>
         <TextInput
           style={styles.amountInput}
           placeholder="0.00"
@@ -188,7 +243,9 @@ export default function EditBudgetScreen() {
           placeholderTextColor="#999"
         />
         <Text style={styles.hint}>
-          Enter the total amount you've spent in this category
+          {budget.type === 'Income' 
+            ? 'Enter the total amount you\'ve earned in this category'
+            : 'Enter the total amount you\'ve spent in this category'}
         </Text>
       </View>
 
@@ -372,5 +429,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  budgetTypeBadge: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

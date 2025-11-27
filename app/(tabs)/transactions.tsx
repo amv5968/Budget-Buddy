@@ -20,6 +20,16 @@ import {
   type Transaction
 } from '../services/transactionService';
 
+const INCOME_CATEGORIES = [
+  'Salary',
+  'Freelance',
+  'Investment',
+  'Business',
+  'Gift',
+  'Bonus',
+  'Other',
+];
+
 const EXPENSE_CATEGORIES = [
   'Groceries',
   'Transport',
@@ -41,7 +51,7 @@ export default function TransactionsScreen() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
-  const [type, setType] = useState<'Expense'>('Expense');
+  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -71,34 +81,37 @@ export default function TransactionsScreen() {
     }
   };
 
-  const filterButtons = ['All', 'Bills', 'Food', 'Rent', 'Groceries', 'Transport'];
+  const filterButtons = ['All', 'Income', 'Bills', 'Food', 'Rent', 'Groceries', 'Transport'];
   
   // Bills categories
   const BILLS_CATEGORIES = ['Rent', 'Utilities', 'Phone', 'Internet', 'Insurance', 'Loan'];
 
-  // Only show expense transactions (exclude income)
-  const expenseTransactions = transactions.filter((t) => t.type === 'Expense');
-
-  const filteredTransactions = expenseTransactions.filter((t) => {
+  // Show ALL transactions (both income and expenses)
+  const filteredTransactions = transactions.filter((t) => {
     if (filter === 'All') return true;
-    if (filter === 'Bills') return BILLS_CATEGORIES.includes(t.category);
-    return t.category === filter;
+    if (filter === 'Income') return t.type === 'Income';
+    if (filter === 'Bills') return t.type === 'Expense' && BILLS_CATEGORIES.includes(t.category);
+    return t.type === 'Expense' && t.category === filter;
   });
   
-  // Calculate bills total
-  const billsTotal = expenseTransactions
-    .filter((t) => BILLS_CATEGORIES.includes(t.category))
-    .reduce((sum, t) => sum + t.amount, 0);
+  // Calculate totals
+  const totalIncome = transactions
+    .filter((t) => t.type === 'Income')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-  const totalExpense = Math.abs(
-    expenseTransactions.reduce((sum, t) => sum + t.amount, 0)
-  );
+  const totalExpense = transactions
+    .filter((t) => t.type === 'Expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  const billsTotal = transactions
+    .filter((t) => t.type === 'Expense' && BILLS_CATEGORIES.includes(t.category))
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const startEdit = (t: Transaction) => {
     setEditing(t);
-    setType('Expense'); // Only allow editing expense transactions
+    setType(t.type); // Allow editing both income and expense transactions
     setCategory(t.category);
-    setAmount(t.amount.toString());
+    setAmount(Math.abs(t.amount).toString());
     setDescription(t.description || '');
   };
 
@@ -325,7 +338,7 @@ export default function TransactionsScreen() {
 
   // 🔹 If in edit mode
   if (editing) {
-    const categories = EXPENSE_CATEGORIES;
+    const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
     return (
       <ScrollView style={styles.container}>
         <View style={styles.header}>
@@ -457,8 +470,8 @@ export default function TransactionsScreen() {
             style={styles.transactionCard}
             onPress={() => startEdit(item)}
           >
-            <View style={styles.iconContainer}>
-              <Text style={styles.icon}>💵</Text>
+            <View style={[styles.iconContainer, { backgroundColor: item.type === 'Income' ? '#E8F5E9' : '#FFEBEE' }]}>
+              <Text style={styles.icon}>{item.type === 'Income' ? '💰' : '💸'}</Text>
             </View>
             <View style={styles.transactionInfo}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -475,13 +488,13 @@ export default function TransactionsScreen() {
               <Text
                 style={[
                   styles.transactionAmount,
-                  { color: colors.expense },
+                  { color: item.type === 'Income' ? colors.income : colors.expense },
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.8}
               >
-                -${Math.abs(item.amount).toFixed(2)}
+                {item.type === 'Income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
               </Text>
               <Text style={styles.transactionDate}>
                 {new Date(item.date).toLocaleDateString()}
@@ -492,6 +505,18 @@ export default function TransactionsScreen() {
       />
 
       <View style={styles.summaryFooter}>
+        <View style={styles.summaryItem}>
+          <Text 
+            style={[styles.summaryValue, { color: colors.income }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            ${totalIncome.toFixed(2)}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Income</Text>
+        </View>
+        <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text 
             style={[styles.summaryValue, { color: colors.expense }]}
@@ -506,26 +531,14 @@ export default function TransactionsScreen() {
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text 
-            style={[styles.summaryValue, { color: '#FF9800' }]}
+            style={[styles.summaryValue, { color: totalIncome - totalExpense >= 0 ? colors.income : colors.expense }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
           >
-            ${billsTotal.toFixed(2)}
+            ${(totalIncome - totalExpense).toFixed(2)}
           </Text>
-          <Text style={styles.summaryLabel}>Bills</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text 
-            style={[styles.summaryValue, { color: '#4CAF50' }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            ${(totalExpense - billsTotal).toFixed(2)}
-          </Text>
-          <Text style={styles.summaryLabel}>Other Expenses</Text>
+          <Text style={styles.summaryLabel}>Balance</Text>
         </View>
       </View>
     </View>

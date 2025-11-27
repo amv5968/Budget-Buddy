@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -235,7 +235,10 @@ export default function BudgetsScreen() {
             return (
               <TouchableOpacity
                 style={styles.budgetCard}
-                onPress={() => router.push(`/edit-budget?id=${item._id}`)}
+                onPress={() => {
+                  console.log('Clicking budget from budgets screen:', { id: item._id, category: item.category, type: item.type });
+                  router.push(`/(tabs)/edit-budget?id=${item._id}&returnTo=/(tabs)/budgets`);
+                }}
               >
                 <View style={styles.budgetHeader}>
                   <View style={styles.budgetInfo}>

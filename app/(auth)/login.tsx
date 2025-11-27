@@ -1,25 +1,29 @@
+//Path: Budget-Buddy/app/(auth)/login.tsx
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet,
+import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
-  Alert
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { login as apiLogin } from '../services/authService';
 import { useAuth } from '../../context/AuthContext';
+import { login as apiLogin } from '../services/authService';
 
 export default function LoginScreen() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const router = useRouter();
   const { login } = useAuth();
 
@@ -67,6 +71,7 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputSection}>
+              {/* Email / Username */}
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder="Email or Username"
@@ -75,10 +80,16 @@ export default function LoginScreen() {
                     if (text.length <= 100) {
                       setEmailOrUsername(text);
                       if (text.length === 100) {
-                        Alert.alert('Character Limit Reached', 'Email or username cannot exceed 100 characters');
+                        Alert.alert(
+                          'Character Limit Reached',
+                          'Email or username cannot exceed 100 characters'
+                        );
                       }
                     } else {
-                      Alert.alert('Input Too Long', 'Email or username must be 100 characters or less');
+                      Alert.alert(
+                        'Input Too Long',
+                        'Email or username must be 100 characters or less'
+                      );
                     }
                   }}
                   style={styles.input}
@@ -90,26 +101,47 @@ export default function LoginScreen() {
                 />
               </View>
 
+              {/* Password with eye icon */}
               <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Password"
-                  value={password}
-                  onChangeText={(text) => {
-                    if (text.length <= 32) {
-                      setPassword(text);
-                      if (text.length === 32) {
-                        Alert.alert('Character Limit Reached', 'Password cannot exceed 32 characters');
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    placeholder="Password"
+                    value={password}
+                    onChangeText={(text) => {
+                      if (text.length <= 32) {
+                        setPassword(text);
+                        if (text.length === 32) {
+                          Alert.alert(
+                            'Character Limit Reached',
+                            'Password cannot exceed 32 characters'
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Password Too Long',
+                          'Password must be 32 characters or less'
+                        );
                       }
-                    } else {
-                      Alert.alert('Password Too Long', 'Password must be 32 characters or less');
-                    }
-                  }}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  editable={!loading}
-                  maxLength={32}
-                />
+                    }}
+                    secureTextEntry={!showPassword}
+                    style={[styles.input, { paddingRight: 45 }]}
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    maxLength={32}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    style={styles.eyeButton}
+                    disabled={loading}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye' : 'eye-off'}
+                      size={22}
+                      color="#555"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <TouchableOpacity 
@@ -208,6 +240,15 @@ const styles = StyleSheet.create({
     padding: 18,
     fontSize: 16,
     color: '#333',
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    padding: 6,
   },
   loginButton: {
     backgroundColor: '#66BB6A',

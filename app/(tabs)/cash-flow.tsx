@@ -49,7 +49,7 @@ const CashFlowScreen: React.FC = () => {
 
       setTransactions(transData);
 
-      // Filter by time period
+      // Filter transactions by time period
       const now = new Date();
       const filteredTransactions = transData.filter((t: Transaction) => {
         const transDate = new Date(t.date);
@@ -62,13 +62,15 @@ const CashFlowScreen: React.FC = () => {
         return true;
       });
 
+      // Calculate income from Income transactions
       const income = filteredTransactions
         .filter((t: Transaction) => t.type === 'Income')
-        .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+        .reduce((sum: number, t: Transaction) => sum + Math.abs(t.amount), 0);
 
+      // Calculate expenses from Expense transactions
       const expenses = filteredTransactions
         .filter((t: Transaction) => t.type === 'Expense')
-        .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+        .reduce((sum: number, t: Transaction) => sum + Math.abs(t.amount), 0);
 
       setTotalIncome(income);
       setTotalExpenses(expenses);
@@ -85,7 +87,7 @@ const CashFlowScreen: React.FC = () => {
   const expensesByCategory = transactions
     .filter((t: Transaction) => t.type === 'Expense')
     .reduce((acc: { [key: string]: number }, t: Transaction) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      acc[t.category] = (acc[t.category] || 0) + Math.abs(t.amount);
       return acc;
     }, {});
 

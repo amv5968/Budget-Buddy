@@ -37,7 +37,7 @@ export default function AddBudgetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const returnTo = (params.returnTo as string) || '/(tabs)/budgets';
-  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
+  const type = 'Expense'; // Budgets are only for expenses
   const [category, setCategory] = useState('');
   const [icon, setIcon] = useState('');
   const [amount, setAmount] = useState('');
@@ -88,39 +88,7 @@ export default function AddBudgetScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Budget Type</Text>
-        <View style={styles.typeContainer}>
-          <TouchableOpacity
-            style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
-            onPress={() => {
-              setType('Income');
-              setCategory(''); // Reset category when switching type
-              setIcon('');
-            }}
-          >
-            <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
-              💰 Income
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
-            onPress={() => {
-              setType('Expense');
-              setCategory(''); // Reset category when switching type
-              setIcon('');
-            }}
-          >
-            <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
-              💸 Expense
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>
-          {type === 'Income' ? 'Expected Monthly Income' : 'Monthly Budget Amount'}
-        </Text>
+        <Text style={styles.label}>Monthly Budget Amount</Text>
         <TextInput
           style={styles.amountInput}
           placeholder="$0.00"
@@ -148,7 +116,7 @@ export default function AddBudgetScreen() {
       <View style={styles.section}>
         <Text style={styles.label}>Select Category</Text>
         <View style={styles.categoryGrid}>
-          {(type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
+          {EXPENSE_CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.name}
               style={[

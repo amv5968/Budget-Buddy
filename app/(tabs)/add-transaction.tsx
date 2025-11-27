@@ -14,6 +14,16 @@ import {
 import { maybeTriggerThresholdAlerts, notifyNewTransaction } from '../services/notificationService';
 import { addTransaction, createRecurringTransaction } from '../services/transactionService';
 
+const INCOME_CATEGORIES = [
+  'Salary',
+  'Freelance',
+  'Investment',
+  'Business',
+  'Gift',
+  'Bonus',
+  'Other',
+];
+
 const EXPENSE_CATEGORIES = [
   'Groceries',
   'Transport',
@@ -42,7 +52,7 @@ export default function AddTransactionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const returnTo = (params.returnTo as string) || '/(tabs)';
-  const type = 'Expense'; // Always Expense - income removed
+  const [type, setType] = useState<'Income' | 'Expense'>('Expense');
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -53,7 +63,7 @@ export default function AddTransactionScreen() {
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [endDate, setEndDate] = useState('');
 
-  const categories = EXPENSE_CATEGORIES;
+  const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   const handleSubmit = async () => {
     if (!category) {
@@ -122,6 +132,34 @@ export default function AddTransactionScreen() {
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Add Transaction</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Transaction Type</Text>
+        <View style={styles.typeContainer}>
+          <TouchableOpacity
+            style={[styles.typeButton, type === 'Income' && styles.typeButtonActive]}
+            onPress={() => {
+              setType('Income');
+              setCategory(''); // Reset category when switching type
+            }}
+          >
+            <Text style={[styles.typeText, type === 'Income' && styles.typeTextActive]}>
+              💰 Income
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.typeButton, type === 'Expense' && styles.typeButtonActive]}
+            onPress={() => {
+              setType('Expense');
+              setCategory(''); // Reset category when switching type
+            }}
+          >
+            <Text style={[styles.typeText, type === 'Expense' && styles.typeTextActive]}>
+              💸 Expense
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -421,5 +459,31 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 6,
     fontStyle: 'italic',
+  },
+  typeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 10,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+  },
+  typeButtonActive: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+  },
+  typeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  typeTextActive: {
+    color: '#2196F3',
   },
 });
