@@ -38,3 +38,11 @@ export const updateBudgetSpent = async (
   const response = await api.put(`/budgets/${id}`, { spentAmount });
   return response.data;
 };
+
+export const getTotalBudget = (budgets: Budget[]): number => {
+  return budgets.reduce((total, budget) => total + budget.totalAmount, 0);
+};
+
+export const getTotalSpent = (budgets: Budget[]): number => {
+  return budgets.reduce((total, budget) => total + budget.spentAmount, 0);
+};

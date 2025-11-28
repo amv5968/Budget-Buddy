@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { getBudgets, type Budget } from '../services/budgetService';
+import { getBudgets, getTotalBudget, getTotalSpent, type Budget } from '../services/budgetService';
 
 export default function BudgetsScreen() {
   const router = useRouter();
@@ -197,6 +197,10 @@ export default function BudgetsScreen() {
     );
   }
 
+  const totalBudget = getTotalBudget(budgets);
+  const totalSpent = getTotalSpent(budgets);
+  const totalPercentage = getProgressPercentage(totalSpent, totalBudget);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -227,6 +231,42 @@ export default function BudgetsScreen() {
           keyExtractor={(item) => item._id}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListHeaderComponent={
+            <View style={styles.budgetCard}>
+              <View style={styles.budgetHeader}>
+                <View style={styles.budgetInfo}>
+                  <Text style={styles.budgetIcon}>📊</Text>
+                  <View>
+                    <Text style={styles.budgetCategory}>Total Budget</Text>
+                    <Text style={styles.budgetAmount}>
+                      ${totalSpent.toFixed(2)} / ${totalBudget.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.budgetPercentage}>
+                  <Text style={[styles.percentageText, { color: '#2196F3' }]}>
+                    {totalPercentage.toFixed(0)}%
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.progressBarContainer}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    {
+                      width: `${totalPercentage}%`,
+                      backgroundColor: '#2196F3',
+                    },
+                  ]}
+                />
+              </View>
+
+              <Text style={styles.remainingText}>
+                ${(totalBudget - totalSpent).toFixed(2)} remaining
+              </Text>
+            </View>
           }
           renderItem={({ item }) => {
             const percentage = getProgressPercentage(item.spentAmount, item.totalAmount);

@@ -307,6 +307,20 @@ const ResourcesScreen: React.FC = () => {
       desc: 'Estimate monthly payments and see how different repayment plans affect your loans.',
       icon: '🧮',
     },
+    {
+      category: 'Learning',
+      title: '​PA Personal Income Tax Guide',
+      url: 'https://www.pa.gov/agencies/revenue/forms-and-publications/pa-personal-income-tax-guide',
+      desc: 'Information and requirements on filing taxes in PA.',
+      icon: '📝',
+    },
+    {
+      category: 'Learning',
+      title: 'Tax information for students',
+      url: 'https://www.irs.gov/individuals/students',
+      desc: 'Student-specific tax information.',
+      icon: '✍️',
+    },
   ];
 
   const studentTips: Tip[] = [
