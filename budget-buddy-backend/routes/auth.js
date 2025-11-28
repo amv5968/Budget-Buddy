@@ -52,7 +52,7 @@ router.post('/signup', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        monthlyAllowance: user.monthlyAllowance || 1000
+        monthlyAllowance: user.monthlyAllowance || 0
       }
     });
   } catch (error) {
@@ -95,7 +95,7 @@ router.post('/login', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        monthlyAllowance: user.monthlyAllowance || 1000
+        monthlyAllowance: user.monthlyAllowance || 0
       }
     });
   } catch (error) {
@@ -117,7 +117,7 @@ router.get('/profile', auth, async (req, res) => {
       id: user._id,
       username: user.username,
       email: user.email,
-      monthlyAllowance: user.monthlyAllowance || 1000
+      monthlyAllowance: user.monthlyAllowance || 0
     });
   } catch (error) {
     console.error('Profile error:', error);

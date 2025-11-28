@@ -43,6 +43,20 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   // Sidebar menu items
   const menuItems = [
     {
+      id: 'expense-breakdown',
+      title: 'Expense Breakdown',
+      icon: '📊',
+      description: 'Analyze your spending by category',
+      route: '/expense-breakdown',
+    },
+    {
+      id: 'calendar',
+      title: 'Calendar',
+      icon: '📅',
+      description: 'Track transactions and reminders',
+      route: '/calendar',
+    },
+    {
       id: 'ai-assistant',
       title: 'AI Advisor',
       icon: '🤖',

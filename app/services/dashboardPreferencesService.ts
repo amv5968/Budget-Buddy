@@ -5,8 +5,6 @@ const DASHBOARD_PREFS_KEY = '@dashboard_preferences';
 export interface DashboardPreferences {
   showSummary: boolean;
   showAllowance: boolean;
-  showCharts: boolean;
-  showCalendar: boolean;
   showTransactions: boolean;
   showGoals: boolean;
   showBudgets: boolean;
@@ -15,8 +13,6 @@ export interface DashboardPreferences {
 const DEFAULT_PREFERENCES: DashboardPreferences = {
   showSummary: true,
   showAllowance: true,
-  showCharts: true,
-  showCalendar: true,
   showTransactions: true,
   showGoals: true,
   showBudgets: true,
@@ -52,4 +48,5 @@ export const resetDashboardPreferences = async (): Promise<void> => {
     throw error;
   }
 };
+
 

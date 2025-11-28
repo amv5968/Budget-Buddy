@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,28 +17,45 @@ import {
 } from 'react-native';
 import { resetPassword } from '../services/authService';
 
-// Password validation helper
-const validatePassword = (password: string): { valid: boolean; message: string } => {
+// Password validation helper - returns all unmet requirements
+const validatePassword = (password: string): { valid: boolean; issues: string[] } => {
+  const issues: string[] = [];
+  
   if (password.length < 6) {
-    return { valid: false, message: 'Password must be at least 6 characters' };
+    issues.push('At least 6 characters');
   }
   if (password.length > 32) {
-    return { valid: false, message: 'Password must be at most 32 characters' };
+    issues.push('Maximum 32 characters');
   }
   if (!/[a-z]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one lowercase letter' };
+    issues.push('One lowercase letter (a-z)');
   }
   if (!/[A-Z]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one uppercase letter' };
+    issues.push('One uppercase letter (A-Z)');
   }
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    return {
-      valid: false,
-      message:
-        'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)',
-    };
+    issues.push('One special character (!@#$%^&*()_+-=[]{}|;:,.<>?)');
   }
-  return { valid: true, message: '' };
+  
+  return { valid: issues.length === 0, issues };
+};
+
+// Get password strength and color
+const getPasswordStrength = (password: string): { strength: string; color: string; percentage: number } => {
+  if (!password) return { strength: '', color: '#E0E0E0', percentage: 0 };
+  
+  const validation = validatePassword(password);
+  const metRequirements = 5 - validation.issues.length;
+  
+  if (metRequirements <= 2) {
+    return { strength: 'Weak', color: '#F44336', percentage: 33 };
+  } else if (metRequirements <= 3) {
+    return { strength: 'Fair', color: '#FF9800', percentage: 50 };
+  } else if (metRequirements <= 4) {
+    return { strength: 'Good', color: '#FFC107', percentage: 75 };
+  } else {
+    return { strength: 'Strong', color: '#66BB6A', percentage: 100 };
+  }
 };
 
 export default function ResetPasswordScreen() {
@@ -53,6 +71,9 @@ export default function ResetPasswordScreen() {
   // 👁️ show/hide toggles (same pattern as login/signup)
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Info modal state
+  const [showPasswordInfo, setShowPasswordInfo] = useState(false);
 
   const handleResetPassword = async () => {
     if (!token.trim()) {
@@ -73,7 +94,11 @@ export default function ResetPasswordScreen() {
     // Validate password requirements
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      Alert.alert('Password Requirements', passwordValidation.message);
+      Alert.alert(
+        'Password Requirements Not Met',
+        'Your password is missing:\n\n' + passwordValidation.issues.map(issue => `• ${issue}`).join('\n'),
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -145,9 +170,18 @@ export default function ResetPasswordScreen() {
 
               {/* New password with eye icon */}
               <View style={styles.inputContainer}>
+                <View style={styles.inputLabelRow}>
+                  <Text style={styles.inputLabel}>New Password</Text>
+                  <TouchableOpacity 
+                    onPress={() => setShowPasswordInfo(true)}
+                    style={styles.infoButton}
+                  >
+                    <Ionicons name="information-circle-outline" size={20} color="#2196F3" />
+                  </TouchableOpacity>
+                </View>
                 <View style={styles.passwordRow}>
                   <TextInput
-                    placeholder="New Password (6-32 chars, requires: A-Z, a-z, special)"
+                    placeholder="Enter your new password"
                     value={newPassword}
                     onChangeText={(text) => {
                       if (text.length <= 32) {
@@ -184,13 +218,44 @@ export default function ResetPasswordScreen() {
                     />
                   </TouchableOpacity>
                 </View>
+                
+                {/* Password Strength Indicator */}
+                {newPassword.length > 0 && (
+                  <View style={styles.strengthContainer}>
+                    <View style={styles.strengthBarBackground}>
+                      <View 
+                        style={[
+                          styles.strengthBarFill, 
+                          { 
+                            width: `${getPasswordStrength(newPassword).percentage}%`,
+                            backgroundColor: getPasswordStrength(newPassword).color
+                          }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={[styles.strengthText, { color: getPasswordStrength(newPassword).color }]}>
+                      {getPasswordStrength(newPassword).strength}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Show unmet requirements */}
+                {newPassword.length > 0 && validatePassword(newPassword).issues.length > 0 && (
+                  <View style={styles.requirementsContainer}>
+                    <Text style={styles.requirementsTitle}>Missing:</Text>
+                    {validatePassword(newPassword).issues.map((issue, index) => (
+                      <Text key={index} style={styles.requirementText}>• {issue}</Text>
+                    ))}
+                  </View>
+                )}
               </View>
 
               {/* Confirm password with eye icon */}
               <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Confirm New Password</Text>
                 <View style={styles.passwordRow}>
                   <TextInput
-                    placeholder="Confirm New Password"
+                    placeholder="Re-enter your new password"
                     value={confirmPassword}
                     onChangeText={(text) => {
                       if (text.length <= 32) {
@@ -229,14 +294,6 @@ export default function ResetPasswordScreen() {
                 </View>
               </View>
 
-              <View style={styles.passwordTips}>
-                <Text style={styles.tipsTitle}>Password Requirements:</Text>
-                <Text style={styles.tipsText}>• Between 6-32 characters long</Text>
-                <Text style={styles.tipsText}>• At least one lowercase letter (a-z)</Text>
-                <Text style={styles.tipsText}>• At least one uppercase letter (A-Z)</Text>
-                <Text style={styles.tipsText}>• At least one special character</Text>
-              </View>
-
               <TouchableOpacity
                 style={[styles.resetButton, loading && styles.resetButtonDisabled]}
                 onPress={handleResetPassword}
@@ -259,6 +316,54 @@ export default function ResetPasswordScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Password Info Modal */}
+      <Modal
+        visible={showPasswordInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPasswordInfo(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Password Requirements</Text>
+              <TouchableOpacity onPress={() => setShowPasswordInfo(false)}>
+                <Ionicons name="close-circle" size={28} color="#999" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <View style={styles.requirementRow}>
+                <Ionicons name="checkmark-circle" size={20} color="#66BB6A" />
+                <Text style={styles.requirementItem}>Between 6-32 characters long</Text>
+              </View>
+              <View style={styles.requirementRow}>
+                <Ionicons name="checkmark-circle" size={20} color="#66BB6A" />
+                <Text style={styles.requirementItem}>At least one lowercase letter (a-z)</Text>
+              </View>
+              <View style={styles.requirementRow}>
+                <Ionicons name="checkmark-circle" size={20} color="#66BB6A" />
+                <Text style={styles.requirementItem}>At least one uppercase letter (A-Z)</Text>
+              </View>
+              <View style={styles.requirementRow}>
+                <Ionicons name="checkmark-circle" size={20} color="#66BB6A" />
+                <Text style={styles.requirementItem}>At least one special character</Text>
+              </View>
+              <Text style={styles.specialCharsText}>
+                {'(!@#$%^&*()_+-=[]{}|;:,.<>?)'}
+              </Text>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.modalButton}
+              onPress={() => setShowPasswordInfo(false)}
+            >
+              <Text style={styles.modalButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -342,23 +447,10 @@ const styles = StyleSheet.create({
     right: 12,
     padding: 6,
   },
-  passwordTips: {
-    marginTop: 8,
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 8,
-  },
-  tipsTitle: {
+  backLink: {
+    color: '#2196F3',
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
-  },
-  tipsText: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
   },
   resetButton: {
     backgroundColor: '#66BB6A',
@@ -386,9 +478,119 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 24,
   },
-  backLink: {
-    color: '#2196F3',
+  inputLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  inputLabel: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  infoButton: {
+    padding: 4,
+  },
+  strengthContainer: {
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    paddingTop: 8,
+  },
+  strengthBarBackground: {
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  strengthBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  strengthText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  requirementsContainer: {
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    paddingTop: 4,
+  },
+  requirementsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F44336',
+    marginBottom: 4,
+  },
+  requirementText: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalBody: {
+    marginBottom: 20,
+  },
+  requirementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  requirementItem: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 10,
+    flex: 1,
+  },
+  specialCharsText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 30,
+    marginTop: -4,
+  },
+  modalButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
+

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { login as apiLogin } from '../services/authService';
+import { hasCompletedOnboarding } from '../services/onboardingService';
 
 export default function LoginScreen() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -37,7 +38,16 @@ export default function LoginScreen() {
     try {
       const response = await apiLogin(emailOrUsername.trim(), password);
       await login(response.user, response.token);
-      router.replace('/(tabs)');
+      
+      // Check if user has completed onboarding
+      const completedOnboarding = await hasCompletedOnboarding();
+      if (!completedOnboarding) {
+        router.push({
+          pathname: '/(onboarding)/onboarding' as any,
+        });
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';

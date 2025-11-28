@@ -15,8 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Calendar } from 'react-native-calendars';
-import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import Sidebar from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -27,6 +25,7 @@ import {
   requestNotificationPermissions,
   scheduleReminderNotification,
 } from '../services/notificationService';
+import { hasCompletedOnboarding } from '../services/onboardingService';
 import { addReminder, getReminders, getRemindersForDate } from '../services/reminderService';
 
 import { Budget, getBudgets } from '../services/budgetService';
@@ -68,9 +67,9 @@ export default function HomeScreen() {
   const [isDateDetailVisible, setIsDateDetailVisible] = useState(false);
 
   // --- allowance state ---
-  const [monthlyAllowance, setMonthlyAllowance] = useState(1000);
+  const [monthlyAllowance, setMonthlyAllowance] = useState(0);
   const [isAllowanceModalVisible, setIsAllowanceModalVisible] = useState(false);
-  const [tempAllowance, setTempAllowance] = useState('1000');
+  const [tempAllowance, setTempAllowance] = useState('0');
 
   // --- sidebar ---
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
@@ -92,8 +91,6 @@ export default function HomeScreen() {
   const [dashboardPrefs, setDashboardPrefs] = useState<DashboardPreferences>({
     showSummary: true,
     showAllowance: true,
-    showCharts: true,
-    showCalendar: true,
     showTransactions: true,
     showGoals: true,
     showBudgets: true,
@@ -151,6 +148,13 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       const refreshDashboard = async () => {
+        const completed = await hasCompletedOnboarding();
+        if (!completed) {
+          router.push({
+            pathname: '/(onboarding)/onboarding' as any,
+          });
+          return;
+        }
         await loadAllowance();
         await loadData();
         await loadAllRemindersForCalendar();
@@ -185,7 +189,7 @@ export default function HomeScreen() {
   const loadAllowance = async () => {
     try {
       const profile = await getUserProfile();
-      const dbAllowance = profile.monthlyAllowance ?? 1000;
+      const dbAllowance = profile.monthlyAllowance ?? 0;
       setMonthlyAllowance(dbAllowance);
       setTempAllowance(dbAllowance.toString());
     } catch (error) {
@@ -195,8 +199,8 @@ export default function HomeScreen() {
         'Unable to load allowance from server. Please check your backend connection.',
         [{ text: 'OK' }]
       );
-      setMonthlyAllowance(1000);
-      setTempAllowance('1000');
+      setMonthlyAllowance(0);
+      setTempAllowance('0');
     }
   };
 
@@ -1499,217 +1503,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Charts Section with Type Selector */}
-      {dashboardPrefs.showCharts && (
-        <View style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Text style={[styles.sectionTitle, { flex: 1, flexShrink: 1 }]}>
-            {selectedChartType === 'pie' && '📊 Expense Breakdown'}
-            {selectedChartType === 'line' && '📈 7-Day Trend'}
-            {selectedChartType === 'bar' && '💰 Income vs Expenses'}
-          </Text>
-          <View style={styles.chartSelector}>
-            <TouchableOpacity
-              style={[styles.chartTypeButton, selectedChartType === 'pie' && styles.chartTypeButtonActive]}
-              onPress={() => setSelectedChartType('pie')}
-            >
-              <Text style={[styles.chartTypeText, selectedChartType === 'pie' && styles.chartTypeTextActive]}>
-                Pie
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chartTypeButton, selectedChartType === 'line' && styles.chartTypeButtonActive]}
-              onPress={() => setSelectedChartType('line')}
-            >
-              <Text style={[styles.chartTypeText, selectedChartType === 'line' && styles.chartTypeTextActive]}>
-                Line
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chartTypeButton, selectedChartType === 'bar' && styles.chartTypeButtonActive]}
-              onPress={() => setSelectedChartType('bar')}
-            >
-              <Text style={[styles.chartTypeText, selectedChartType === 'bar' && styles.chartTypeTextActive]}>
-                Bar
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Pie Chart - Expense Breakdown */}
-        {selectedChartType === 'pie' && (
-          <View>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => {
-                // Find the largest slice as default selection
-                const largestSlice = chartData[0];
-                if (largestSlice && largestSlice.fullName !== 'No Data') {
-                  setSelectedCategory({
-                    name: largestSlice.fullName,
-                    amount: largestSlice.amount,
-                    percentage: largestSlice.percentage,
-                  });
-                  setIsCategoryModalVisible(true);
-                }
-              }}
-            >
-              <PieChart
-                data={chartData}
-                width={screenWidth - 72}
-                height={220}
-                chartConfig={{
-                  backgroundGradientFrom: colors.cardBackground,
-                  backgroundGradientTo: colors.cardBackground,
-                  color: (opacity = 1) => colors.text + Math.round(opacity * 255).toString(16),
-                  strokeWidth: 2,
-                }}
-                accessor="amount"
-                backgroundColor="transparent"
-                paddingLeft="15"
-                hasLegend={false}
-              />
-            </TouchableOpacity>
-            
-            {/* Custom Interactive Legend */}
-            <View style={styles.pieLegendContainer}>
-              {chartData.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.pieLegendItem,
-                    { backgroundColor: colors.cardBackground },
-                  ]}
-                  onPress={() => {
-                    if (item.fullName !== 'No Data') {
-                      setSelectedCategory({
-                        name: item.fullName,
-                        amount: item.amount,
-                        percentage: item.percentage,
-                      });
-                      setIsCategoryModalVisible(true);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.pieLegendColor, { backgroundColor: item.color }]} />
-                  <View style={styles.pieLegendTextContainer}>
-                    <Text style={[styles.pieLegendName, { color: colors.text }]} numberOfLines={1}>
-                      {item.fullName}
-                    </Text>
-                    <Text style={[styles.pieLegendAmount, { color: colors.textSecondary }]}>
-                      ${item.amount.toFixed(2)} ({item.percentage.toFixed(1)}%)
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Line Chart - 7-Day Spending Trend */}
-        {selectedChartType === 'line' && (
-          <LineChart
-            data={{
-              labels: spendingTrendData.labels,
-              datasets: [{ data: spendingTrendData.data.length > 0 ? spendingTrendData.data : [0] }],
-            }}
-            width={screenWidth - 72}
-            height={220}
-            yAxisLabel="$"
-            yAxisSuffix=""
-            chartConfig={{
-              backgroundColor: colors.cardBackground,
-              backgroundGradientFrom: colors.cardBackground,
-              backgroundGradientTo: colors.cardBackground,
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(66, 165, 245, ${opacity})`,
-              labelColor: (opacity = 1) => colors.text,
-              style: { borderRadius: 16 },
-              propsForDots: {
-                r: '6',
-                strokeWidth: '2',
-                stroke: '#42A5F5',
-              },
-            }}
-            bezier
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-            }}
-          />
-        )}
-
-        {/* Bar Chart - Income vs Expenses */}
-        {selectedChartType === 'bar' && (
-          <BarChart
-            data={{
-              labels: incomeVsExpensesData.labels,
-              datasets: [{ data: incomeVsExpensesData.data.length > 0 ? incomeVsExpensesData.data : [0, 0] }],
-            }}
-            width={screenWidth - 72}
-            height={220}
-            yAxisLabel="$"
-            yAxisSuffix=""
-            chartConfig={{
-              backgroundColor: colors.cardBackground,
-              backgroundGradientFrom: colors.cardBackground,
-              backgroundGradientTo: colors.cardBackground,
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(102, 187, 106, ${opacity})`,
-              labelColor: (opacity = 1) => colors.text,
-              style: { borderRadius: 16 },
-              barPercentage: 0.7,
-            }}
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-            }}
-            showValuesOnTopOfBars
-            fromZero
-          />
-        )}
-        </View>
-      )}
-
-      {dashboardPrefs.showCalendar && (
-        <View style={styles.calendarSection}>
-        <Text style={styles.sectionTitle}>📅 Calendar</Text>
-        <Text style={styles.calendarSubtitle}>Tap a date to view transactions • Dots indicate activity</Text>
-
-        <Calendar
-          onDayPress={handleDateSelect}
-          markedDates={getMarkedDates()}
-          markingType="multi-dot"
-          theme={{
-            selectedDayBackgroundColor: colors.primary,
-            todayTextColor: colors.income,
-            backgroundColor: colors.cardBackground,
-            calendarBackground: colors.cardBackground,
-            textSectionTitleColor: colors.text,
-            dayTextColor: colors.text,
-            monthTextColor: colors.text,
-            textDisabledColor: colors.textSecondary,
-            dotColor: colors.primary,
-            selectedDotColor: '#fff',
-          }}
-        />
-
-        {/* Legend */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, gap: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginRight: 6 }} />
-            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Spending</Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF9800', marginRight: 6 }} />
-            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Reminder</Text>
-          </View>
-        </View>
-        </View>
-      )}
-
       {dashboardPrefs.showTransactions && (
         <>
           <View style={styles.headerRow}>
@@ -2143,38 +1936,6 @@ export default function HomeScreen() {
                     onValueChange={() => handleToggleSection('showAllowance')}
                     trackColor={{ false: colors.border, true: colors.primary + '80' }}
                     thumbColor={tempPrefs.showAllowance ? colors.primary : colors.textSecondary}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.customizeItem}
-                  onPress={() => handleToggleSection('showCharts')}
-                >
-                  <View style={styles.customizeItemLeft}>
-                    <Text style={styles.customizeItemIcon}>📈</Text>
-                    <Text style={styles.customizeItemText}>Charts</Text>
-                  </View>
-                  <Switch
-                    value={tempPrefs.showCharts}
-                    onValueChange={() => handleToggleSection('showCharts')}
-                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
-                    thumbColor={tempPrefs.showCharts ? colors.primary : colors.textSecondary}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.customizeItem}
-                  onPress={() => handleToggleSection('showCalendar')}
-                >
-                  <View style={styles.customizeItemLeft}>
-                    <Text style={styles.customizeItemIcon}>📅</Text>
-                    <Text style={styles.customizeItemText}>Calendar</Text>
-                  </View>
-                  <Switch
-                    value={tempPrefs.showCalendar}
-                    onValueChange={() => handleToggleSection('showCalendar')}
-                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
-                    thumbColor={tempPrefs.showCalendar ? colors.primary : colors.textSecondary}
                   />
                 </TouchableOpacity>
 

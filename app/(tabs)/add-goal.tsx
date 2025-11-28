@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -18,6 +20,7 @@ interface Goal {
   name: string;
   targetAmount: number;
   icon: string;
+  targetDate?: string;
 }
 
 const GOAL_ICONS = [
@@ -37,13 +40,18 @@ const GOAL_ICONS = [
 
 export default function AddGoalScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ goal?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{ goal?: string; returnTo?: string; presetDate?: string }>();
   const { goal } = params;
   const returnTo = (params.returnTo as string) || '/(tabs)/goals';
+  const presetDate = params.presetDate as string;
 
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [selectedIcon, setSelectedIcon] = useState(GOAL_ICONS[0]);
+  const [targetDate, setTargetDate] = useState<Date | undefined>(
+    presetDate ? new Date(presetDate + 'T12:00:00') : undefined
+  );
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [goalId, setGoalId] = useState<string | undefined>(undefined);
@@ -55,6 +63,9 @@ export default function AddGoalScreen() {
         setName(parsedGoal.name);
         setTargetAmount(parsedGoal.targetAmount.toString());
         setSelectedIcon(parsedGoal.icon || GOAL_ICONS[0]);
+        if (parsedGoal.targetDate) {
+          setTargetDate(new Date(parsedGoal.targetDate));
+        }
         setGoalId(parsedGoal.id);
         setIsEditing(true);
       } catch (err) {
@@ -80,6 +91,7 @@ export default function AddGoalScreen() {
         name: name.trim(),
         targetAmount: parseFloat(targetAmount),
         icon: selectedIcon,
+        targetDate: targetDate ? targetDate.toISOString() : undefined,
       });
 
       Alert.alert('Success', 'Goal created successfully!');
@@ -148,7 +160,18 @@ export default function AddGoalScreen() {
           style={styles.amountInput}
           placeholder="0.00"
           value={targetAmount}
-          onChangeText={setTargetAmount}
+          onChangeText={(text) => {
+            const cleaned = text.replace(/[^0-9.]/g, '');
+            const parts = cleaned.split('.');
+            let formatted = parts[0];
+            if (parts.length > 1) {
+              formatted += '.' + parts.slice(1).join('').substring(0, 2);
+            }
+            const numValue = parseFloat(formatted) || 0;
+            if (numValue <= 9999999.99) {
+              setTargetAmount(formatted);
+            }
+          }}
           keyboardType="decimal-pad"
           placeholderTextColor="#999"
         />
@@ -170,6 +193,50 @@ export default function AddGoalScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>🎯 Target Date (Optional)</Text>
+        <Text style={styles.sublabel}>Set a deadline to reach your goal</Text>
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+          <Text style={styles.dateButtonText}>
+            {targetDate
+              ? targetDate.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : 'No target date set'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#666" />
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={targetDate || new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            minimumDate={new Date()}
+            onChange={(event: any, selectedDate?: Date) => {
+              setShowDatePicker(Platform.OS === 'ios');
+              if (selectedDate) {
+                setTargetDate(selectedDate);
+              }
+            }}
+          />
+        )}
+        {targetDate && (
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={() => setTargetDate(undefined)}
+          >
+            <Text style={styles.clearButtonText}>Clear Target Date</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity
@@ -235,6 +302,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 12,
+  },
+  sublabel: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: -8,
     marginBottom: 12,
   },
   nameInput: {
@@ -314,5 +387,31 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  dateButton: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dateButtonText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  clearButton: {
+    marginTop: 8,
+    padding: 8,
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    fontSize: 14,
+    color: '#E57373',
+    fontWeight: '500',
   },
 });

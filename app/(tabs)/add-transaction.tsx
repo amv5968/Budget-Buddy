@@ -1,8 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -52,16 +55,27 @@ export default function AddTransactionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const returnTo = (params.returnTo as string) || '/(tabs)';
+  const presetDate = params.presetDate as string;
+  
   const [type, setType] = useState<'Income' | 'Expense'>('Expense');
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Date picker states - use preset date if provided from calendar
+  const [transactionDate, setTransactionDate] = useState(
+    presetDate ? new Date(presetDate + 'T12:00:00') : new Date()
+  );
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
   // Recurring transaction fields
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
-  const [endDate, setEndDate] = useState('');
+  const [recurringStartDate, setRecurringStartDate] = useState(new Date());
+  const [showRecurringStartPicker, setShowRecurringStartPicker] = useState(false);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const categories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
@@ -86,8 +100,8 @@ export default function AddTransactionScreen() {
           amount: parseFloat(amount),
           description: description.trim(),
           frequency,
-          startDate: new Date().toISOString(),
-          endDate: endDate ? new Date(endDate).toISOString() : undefined,
+          startDate: recurringStartDate.toISOString(),
+          endDate: endDate ? endDate.toISOString() : undefined,
         });
 
         Alert.alert(
@@ -102,7 +116,7 @@ export default function AddTransactionScreen() {
           category,
           amount: parseFloat(amount),
           description: description.trim(),
-          date: new Date().toISOString(),
+          date: transactionDate.toISOString(),
         });
 
         // Trigger notifications
@@ -226,6 +240,40 @@ export default function AddTransactionScreen() {
         />
       </View>
 
+      {!isRecurring && (
+        <View style={styles.section}>
+          <Text style={styles.label}>📅 Transaction Date</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+            <Text style={styles.dateButtonText}>
+              {transactionDate.toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#666" />
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={transactionDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event: any, selectedDate?: Date) => {
+                setShowDatePicker(Platform.OS === 'ios');
+                if (selectedDate) {
+                  setTransactionDate(selectedDate);
+                }
+              }}
+            />
+          )}
+        </View>
+      )}
+
       <View style={styles.section}>
         <View style={styles.recurringHeader}>
           <View>
@@ -267,17 +315,76 @@ export default function AddTransactionScreen() {
               ))}
             </View>
 
+            <Text style={[styles.label, { marginTop: 16 }]}>Start Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowRecurringStartPicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+              <Text style={styles.dateButtonText}>
+                {recurringStartDate.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
+            {showRecurringStartPicker && (
+              <DateTimePicker
+                value={recurringStartDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event: any, selectedDate?: Date) => {
+                  setShowRecurringStartPicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setRecurringStartDate(selectedDate);
+                  }
+                }}
+              />
+            )}
+
             <Text style={[styles.label, { marginTop: 16 }]}>End Date (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD or leave empty for no end"
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.helperText}>
-              Leave empty to continue indefinitely
-            </Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowEndDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+              <Text style={styles.dateButtonText}>
+                {endDate
+                  ? endDate.toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : 'No end date (continues indefinitely)'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={endDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minimumDate={recurringStartDate}
+                onChange={(event: any, selectedDate?: Date) => {
+                  setShowEndDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setEndDate(selectedDate);
+                  }
+                }}
+              />
+            )}
+            {endDate && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => setEndDate(undefined)}
+              >
+                <Text style={styles.clearButtonText}>Clear End Date</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -485,5 +592,31 @@ const styles = StyleSheet.create({
   },
   typeTextActive: {
     color: '#2196F3',
+  },
+  dateButton: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dateButtonText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  clearButton: {
+    marginTop: 8,
+    padding: 8,
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    fontSize: 14,
+    color: '#E57373',
+    fontWeight: '500',
   },
 });

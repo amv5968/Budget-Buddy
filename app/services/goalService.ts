@@ -7,6 +7,7 @@ export interface Goal {
   targetAmount: number;
   savedAmount: number;
   icon?: string;
+  targetDate?: string;
   createdAt: string;
 }
 
@@ -25,6 +26,7 @@ export const addGoal = async (data: {
   name: string;
   targetAmount: number;
   icon?: string;
+  targetDate?: string;
 }): Promise<Goal> => {
   const response = await api.post('/goals', data);
   return response.data;
@@ -46,7 +48,7 @@ export const updateGoalSaved = async (
  */
 export const updateGoal = async (
   id: string,
-  data: Partial<Pick<Goal, 'name' | 'targetAmount' | 'icon'>>
+  data: Partial<Pick<Goal, 'name' | 'targetAmount' | 'icon' | 'targetDate'>>
 ): Promise<Goal> => {
   const response = await api.put(`/goals/${id}`, data);
   return response.data;
