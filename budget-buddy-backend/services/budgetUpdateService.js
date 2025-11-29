@@ -22,10 +22,12 @@ async function updateBudgetFromTransactions(userId, type, category) {
     }
 
     // Get all transactions matching this budget's type and category
+    // Exclude recurring transaction templates (isRecurring: true)
     const transactions = await Transaction.find({
       userId,
       category: budget.category,
-      type: budget.type
+      type: budget.type,
+      isRecurring: { $ne: true } // Exclude recurring transaction templates
     });
 
     // Calculate total spent/earned from matching transactions

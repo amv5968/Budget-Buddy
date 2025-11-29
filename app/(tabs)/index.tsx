@@ -94,6 +94,7 @@ export default function HomeScreen() {
     showTransactions: true,
     showGoals: true,
     showBudgets: true,
+    showInvestments: true,
   });
   const [isCustomizeModalVisible, setIsCustomizeModalVisible] = useState(false);
   const [tempPrefs, setTempPrefs] = useState<DashboardPreferences>(dashboardPrefs);
@@ -1326,6 +1327,41 @@ export default function HomeScreen() {
       textAlign: 'center',
       marginBottom: 16,
     },
+    investmentSummaryCard: {
+      backgroundColor: colors.cardBackground,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 15,
+      elevation: 2,
+    },
+    investmentSummaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    },
+    investmentSummaryItem: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    investmentSummaryLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      marginBottom: 6,
+      textTransform: 'uppercase',
+    },
+    investmentSummaryValue: {
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    viewAllButton: {
+      padding: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    viewAllText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.primary,
+    },
   });
 
   if (loading) {
@@ -1657,6 +1693,118 @@ export default function HomeScreen() {
         </>
       )}
 
+      {/* Investments Section */}
+      {dashboardPrefs.showInvestments && (
+        <>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>📈 Investments</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => router.push('/(tabs)/add-transaction?returnTo=/(tabs)')}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(() => {
+            // Filter investment transactions (Income type with Investment category)
+            const investmentTransactions = allTransactions.filter(
+              (t) => t.type === 'Income' && t.category === 'Investment'
+            );
+            const totalInvestments = investmentTransactions.reduce(
+              (sum, t) => sum + Math.abs(t.amount),
+              0
+            );
+            const recentInvestments = investmentTransactions
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .slice(0, 4);
+
+            return investmentTransactions.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="trending-up-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+                <Text style={styles.emptyText}>No investments</Text>
+                <Text style={styles.emptySubtext}>Add investment transactions to track your portfolio!</Text>
+                <TouchableOpacity
+                  style={styles.emptyButton}
+                  onPress={() => router.push('/(tabs)/add-transaction?returnTo=/(tabs)')}
+                >
+                  <Text style={styles.emptyButtonText}>Add Investment</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.listContent}>
+                {/* Investment Summary Card */}
+                <View
+                  style={[
+                    styles.investmentSummaryCard,
+                    { backgroundColor: colors.cardBackground },
+                  ]}
+                >
+                  <View style={styles.investmentSummaryRow}>
+                    <View style={styles.investmentSummaryItem}>
+                      <Text style={[styles.investmentSummaryLabel, { color: colors.textSecondary }]}>
+                        Total Investments
+                      </Text>
+                      <Text style={[styles.investmentSummaryValue, { color: colors.income }]}>
+                        ${totalInvestments.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={styles.investmentSummaryItem}>
+                      <Text style={[styles.investmentSummaryLabel, { color: colors.textSecondary }]}>
+                        Transactions
+                      </Text>
+                      <Text style={[styles.investmentSummaryValue, { color: colors.text }]}>
+                        {investmentTransactions.length}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Recent Investment Transactions */}
+                {recentInvestments.map((item) => (
+                  <TouchableOpacity
+                    key={item._id}
+                    style={styles.transactionItem}
+                    onPress={() => router.push('/(tabs)/transactions')}
+                  >
+                    <View style={styles.transactionLeft}>
+                      <View style={styles.iconContainer}>
+                        <Text style={styles.transactionIcon}>📈</Text>
+                      </View>
+                      <View style={styles.transactionInfo}>
+                        <Text style={styles.transactionCategory}>
+                          {item.description || 'Investment'}
+                        </Text>
+                        <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.transactionRight}>
+                      <Text style={[styles.transactionAmount, { color: colors.income }]}>
+                        +${Math.abs(item.amount).toFixed(2)}
+                      </Text>
+                      <Text style={[styles.transactionType, { color: colors.textSecondary }]}>
+                        Investment
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                {investmentTransactions.length > 4 && (
+                  <TouchableOpacity
+                    style={styles.viewAllButton}
+                    onPress={() => router.push('/(tabs)/transactions')}
+                  >
+                    <Text style={styles.viewAllText}>
+                      View All {investmentTransactions.length} Investments →
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })()}
+        </>
+      )}
+
       {/* Allowance modal */}
       <Modal
         visible={isAllowanceModalVisible}
@@ -1984,6 +2132,22 @@ export default function HomeScreen() {
                     onValueChange={() => handleToggleSection('showBudgets')}
                     trackColor={{ false: colors.border, true: colors.primary + '80' }}
                     thumbColor={tempPrefs.showBudgets ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showInvestments')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>📈</Text>
+                    <Text style={styles.customizeItemText}>Investments</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showInvestments}
+                    onValueChange={() => handleToggleSection('showInvestments')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showInvestments ? colors.primary : colors.textSecondary}
                   />
                 </TouchableOpacity>
               </View>

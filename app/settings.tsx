@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { scheduleDailyTransactionReminder, scheduleWeeklySummary } from './services/notificationService';
+import { getSubscriptions, deleteSubscription } from './services/subscriptionService';
 
 const SETTINGS_KEY = 'bb.settings.v1';
 
@@ -64,14 +65,21 @@ export default function SettingsScreen() {
   ]);
 
   // Billing/Subscription state
-  const [currentPlan, setCurrentPlan] = useState<'monthly' | 'yearly' | null>('monthly');
-  const [subscriptionStatus, setSubscriptionStatus] = useState<'active' | 'cancelled' | 'expired'>('active');
+  const [currentPlan, setCurrentPlan] = useState<'monthly' | 'yearly' | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'active' | 'cancelled' | 'expired'>('expired');
   const [nextBillingDate, setNextBillingDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
   // Load settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Reload settings when screen comes into focus (to update subscription status)
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, [])
+  );
 
   const loadSettings = async () => {
     try {
@@ -93,6 +101,32 @@ export default function SettingsScreen() {
         setWeeklySummaryHour(settings.weeklySummaryHour?.toString() ?? '9');
         setWeeklySummaryMinute(settings.weeklySummaryMinute?.toString() ?? '0');
         setCurrency(settings.currency ?? 'USD');
+        
+        // Load subscription status
+        if (settings.subscription) {
+          const nextBilling = settings.subscription.nextBillingDate 
+            ? new Date(settings.subscription.nextBillingDate) 
+            : null;
+          
+          // Check if subscription has expired (if status is cancelled or expired, or date has passed)
+          if (nextBilling && nextBilling < new Date() && settings.subscription.status === 'cancelled') {
+            // Subscription has expired, clear it
+            settings.subscription = null;
+            await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            setCurrentPlan(null);
+            setSubscriptionStatus('expired');
+          } else {
+            setCurrentPlan(settings.subscription.plan);
+            setSubscriptionStatus(settings.subscription.status);
+            if (nextBilling) {
+              setNextBillingDate(nextBilling);
+            }
+          }
+        } else {
+          // No subscription found, ensure state is cleared
+          setCurrentPlan(null);
+          setSubscriptionStatus('expired');
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -437,49 +471,38 @@ const handleSave = async () => {
 
   // Billing handlers
   const handleSelectPlan = (plan: 'monthly' | 'yearly') => {
-    const planName = plan === 'monthly' ? 'Monthly ($14/month)' : 'Yearly ($100/year - Save $68!)';
-    const price = plan === 'monthly' ? '$14' : '$100';
-    
-    Alert.alert(
-      'Confirm Subscription',
-      `You're about to subscribe to the ${planName} plan.\n\nYou will be charged ${price}.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Subscribe',
-          onPress: () => processPayment(plan),
-        },
-      ]
-    );
-  };
-
-  const processPayment = async (plan: 'monthly' | 'yearly') => {
-    try {
-
+    // If user already has an active subscription and is changing plans, show confirmation
+    if (currentPlan && subscriptionStatus === 'active' && currentPlan !== plan) {
+      const currentPlanName = currentPlan === 'monthly' ? 'Monthly ($14/month)' : 'Yearly ($100/year)';
+      const newPlanName = plan === 'monthly' ? 'Monthly ($14/month)' : 'Yearly ($100/year - Save $68!)';
       
-      Alert.alert('Processing...', 'Please wait while we process your payment.');
-
-      setTimeout(() => {
-        setCurrentPlan(plan);
-        setSubscriptionStatus('active');
-        const daysToAdd = plan === 'monthly' ? 30 : 365;
-        setNextBillingDate(new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000));
-        
-        Alert.alert(
-          '✅ Payment Successful!',
-          `Welcome to Budget Buddy Premium! Your ${plan === 'monthly' ? 'monthly' : 'yearly'} subscription is now active.`,
-          [{ text: 'Get Started', onPress: () => router.push('/(tabs)') }]
-        );
-      }, 1500);
-      
-      
-    } catch (error) {
-      console.error('Payment error:', error);
-      Alert.alert('Payment Failed', 'There was an error processing your payment. Please try again.');
+      Alert.alert(
+        'Change Subscription Plan',
+        `Switch from ${currentPlanName} to ${newPlanName}?\n\nYou'll be charged for the new plan immediately.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Change Plan',
+            onPress: () => {
+              // Navigate to payment screen
+              router.push({
+                pathname: '/subscription-payment' as any,
+                params: { plan },
+              });
+            },
+          },
+        ]
+      );
+    } else {
+      // New subscription or resubscribing
+      router.push({
+        pathname: '/subscription-payment' as any,
+        params: { plan },
+      });
     }
   };
 
-  const handleCancelSubscription = () => {
+  const handleCancelSubscription = async () => {
     Alert.alert(
       '⚠️ Cancel Subscription',
       `Are you sure you want to cancel your subscription?\n\nYou'll lose access to premium features at the end of your billing period (${nextBillingDate.toLocaleDateString()}).`,
@@ -488,12 +511,42 @@ const handleSave = async () => {
         {
           text: 'Yes, Cancel',
           style: 'destructive',
-          onPress: () => {
-            setSubscriptionStatus('cancelled');
-            Alert.alert(
-              'Subscription Cancelled',
-              `Your subscription has been cancelled. You'll have access until ${nextBillingDate.toLocaleDateString()}.`
-            );
+          onPress: async () => {
+            try {
+              // Update subscription status in AsyncStorage
+              const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+              const settings = raw ? JSON.parse(raw) : {};
+              
+              if (settings.subscription) {
+                settings.subscription.status = 'cancelled';
+                await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+              }
+              
+              // Delete Budget Buddy Premium subscription from subscriptions list
+              try {
+                const existingSubs = await getSubscriptions();
+                const existingPremiumSub = existingSubs.find((sub: any) => 
+                  sub.name.includes('Budget Buddy Premium')
+                );
+                
+                if (existingPremiumSub) {
+                  await deleteSubscription(existingPremiumSub._id);
+                  console.log('Deleted Budget Buddy Premium subscription from subscriptions list');
+                }
+              } catch (subError) {
+                console.error('Error deleting subscription from list:', subError);
+                // Continue anyway - subscription status is already updated
+              }
+              
+              setSubscriptionStatus('cancelled');
+              Alert.alert(
+                'Subscription Cancelled',
+                `Your subscription has been cancelled. You'll have access until ${nextBillingDate.toLocaleDateString()}.`
+              );
+            } catch (error) {
+              console.error('Error cancelling subscription:', error);
+              Alert.alert('Error', 'Failed to cancel subscription. Please try again.');
+            }
           },
         },
       ]
@@ -501,32 +554,39 @@ const handleSave = async () => {
   };
 
   const handleChangePlan = (newPlan: 'monthly' | 'yearly') => {
-    const currentPlanName = currentPlan === 'monthly' ? 'Monthly' : 'Yearly';
-    const newPlanName = newPlan === 'monthly' ? 'Monthly ($14/month)' : 'Yearly ($100/year)';
-    
-    Alert.alert(
-      'Change Plan',
-      `Switch from ${currentPlanName} to ${newPlanName}?\n\nChanges will take effect on your next billing cycle.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Change Plan',
-          onPress: () => {
-            setCurrentPlan(newPlan);
-            Alert.alert('Plan Updated', `Your subscription will change to ${newPlanName} on ${nextBillingDate.toLocaleDateString()}.`);
-          },
-        },
-      ]
-    );
+    // Navigate to payment screen to change plan
+    router.push({
+      pathname: '/subscription-payment' as any,
+      params: { plan: newPlan },
+    });
   };
 
   const handleManageBilling = () => {
     Alert.alert(
       'Manage Billing',
-      'View payment history, update payment method, and download invoices.',
+      'Manage your subscription and payment information.',
       [
-        { text: 'Payment History', onPress: () => Alert.alert('Payment History', 'Feature coming soon!') },
-        { text: 'Update Payment Method', onPress: () => Alert.alert('Update Payment', 'Feature coming soon!') },
+        { 
+          text: 'Update Payment Method', 
+          onPress: () => {
+            // Navigate to payment screen to update payment method
+            router.push({
+              pathname: '/subscription-payment' as any,
+              params: { plan: currentPlan || 'monthly' },
+            });
+          }
+        },
+        { 
+          text: 'View Subscription Details', 
+          onPress: () => {
+            Alert.alert(
+              'Subscription Details',
+              `Plan: ${currentPlan === 'monthly' ? 'Monthly Premium' : 'Yearly Premium'}\n` +
+              `Status: ${subscriptionStatus === 'active' ? 'Active' : 'Cancelled'}\n` +
+              `Next billing: ${formatDate(nextBillingDate)}`
+            );
+          }
+        },
         { text: 'Close', style: 'cancel' },
       ]
     );
@@ -589,7 +649,7 @@ const handleSave = async () => {
         <Text style={dynamicStyles.sectionHeader}>💳 Billing & Subscription</Text>
         
         {/* Current Plan Status */}
-        {currentPlan && (
+        {currentPlan && subscriptionStatus !== 'expired' && (
           <View style={[dynamicStyles.currentPlanCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <View>
@@ -630,12 +690,23 @@ const handleSave = async () => {
                 </TouchableOpacity>
               </View>
             )}
+
+            {subscriptionStatus === 'cancelled' && (
+              <View style={{ marginTop: 12 }}>
+                <TouchableOpacity
+                  style={[dynamicStyles.manageBillingButton, { backgroundColor: colors.primary }]}
+                  onPress={() => handleSelectPlan(currentPlan)}
+                >
+                  <Text style={dynamicStyles.manageBillingText}>Resubscribe</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 
         {/* Plan Options */}
         <Text style={[dynamicStyles.subSectionTitle, { color: colors.text }]}>
-          {currentPlan ? 'Change Plan' : 'Choose Your Plan'}
+          {currentPlan && subscriptionStatus === 'active' ? 'Change Plan' : currentPlan && subscriptionStatus === 'cancelled' ? 'Resubscribe' : 'Choose Your Plan'}
         </Text>
         
         {/* Monthly Plan */}
@@ -643,12 +714,12 @@ const handleSave = async () => {
           style={[
             dynamicStyles.planOption,
             { 
-              borderColor: currentPlan === 'monthly' ? colors.primary : colors.border,
-              backgroundColor: currentPlan === 'monthly' ? colors.primary + '10' : colors.cardBackground 
+              borderColor: currentPlan === 'monthly' && subscriptionStatus === 'active' ? colors.primary : colors.border,
+              backgroundColor: currentPlan === 'monthly' && subscriptionStatus === 'active' ? colors.primary + '10' : colors.cardBackground 
             }
           ]}
-          onPress={() => currentPlan === 'monthly' ? null : handleSelectPlan('monthly')}
-          disabled={currentPlan === 'monthly'}
+          onPress={() => handleSelectPlan('monthly')}
+          disabled={currentPlan === 'monthly' && subscriptionStatus === 'active'}
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flex: 1 }}>
@@ -662,7 +733,7 @@ const handleSave = async () => {
                 $14 <Text style={{ fontSize: 14, color: colors.textSecondary }}>/month</Text>
               </Text>
             </View>
-            {currentPlan === 'monthly' && (
+            {currentPlan === 'monthly' && subscriptionStatus === 'active' && (
               <View style={[dynamicStyles.currentBadge, { backgroundColor: colors.primary }]}>
                 <Text style={dynamicStyles.currentBadgeText}>Current</Text>
               </View>
@@ -680,12 +751,12 @@ const handleSave = async () => {
           style={[
             dynamicStyles.planOption,
             { 
-              borderColor: currentPlan === 'yearly' ? colors.primary : colors.border,
-              backgroundColor: currentPlan === 'yearly' ? colors.primary + '10' : colors.cardBackground 
+              borderColor: currentPlan === 'yearly' && subscriptionStatus === 'active' ? colors.primary : colors.border,
+              backgroundColor: currentPlan === 'yearly' && subscriptionStatus === 'active' ? colors.primary + '10' : colors.cardBackground 
             }
           ]}
-          onPress={() => currentPlan === 'yearly' ? null : handleSelectPlan('yearly')}
-          disabled={currentPlan === 'yearly'}
+          onPress={() => handleSelectPlan('yearly')}
+          disabled={currentPlan === 'yearly' && subscriptionStatus === 'active'}
         >
           <View style={dynamicStyles.saveBadgeContainer}>
             <View style={[dynamicStyles.saveBadge, { backgroundColor: '#4CAF50' }]}>
@@ -707,7 +778,7 @@ const handleSave = async () => {
                 Only $8.33/month
               </Text>
             </View>
-            {currentPlan === 'yearly' && (
+            {currentPlan === 'yearly' && subscriptionStatus === 'active' && (
               <View style={[dynamicStyles.currentBadge, { backgroundColor: colors.primary }]}>
                 <Text style={dynamicStyles.currentBadgeText}>Current</Text>
               </View>

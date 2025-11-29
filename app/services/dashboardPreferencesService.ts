@@ -8,6 +8,7 @@ export interface DashboardPreferences {
   showTransactions: boolean;
   showGoals: boolean;
   showBudgets: boolean;
+  showInvestments: boolean;
 }
 
 const DEFAULT_PREFERENCES: DashboardPreferences = {
@@ -16,6 +17,7 @@ const DEFAULT_PREFERENCES: DashboardPreferences = {
   showTransactions: true,
   showGoals: true,
   showBudgets: true,
+  showInvestments: true,
 };
 
 export const getDashboardPreferences = async (): Promise<DashboardPreferences> => {

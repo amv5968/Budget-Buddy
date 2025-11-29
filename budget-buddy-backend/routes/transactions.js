@@ -47,7 +47,12 @@ router.post('/', auth, async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
   try {
-    const transactions = await Transaction.find({ userId: req.userId })
+    // Exclude recurring transaction templates (isRecurring: true)
+    // Only return actual transactions (isRecurring: false or null)
+    const transactions = await Transaction.find({ 
+      userId: req.userId,
+      isRecurring: { $ne: true } // Exclude recurring transaction templates
+    })
       .sort({ date: -1, createdAt: -1 });
     
     res.json(transactions);
@@ -61,7 +66,11 @@ router.get('/stats', auth, async (req, res) => {
   try {
     console.log('Fetching stats for userId:', req.userId);
     
-    const allTransactions = await Transaction.find({ userId: req.userId });
+    // Exclude recurring transaction templates (isRecurring: true)
+    const allTransactions = await Transaction.find({ 
+      userId: req.userId,
+      isRecurring: { $ne: true } // Exclude recurring transaction templates
+    });
     console.log('Total transactions found:', allTransactions.length);
     
     let totalIncome = 0;

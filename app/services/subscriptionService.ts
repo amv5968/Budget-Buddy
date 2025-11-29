@@ -5,6 +5,7 @@ export interface SubscriptionData {
   amount: number;
   renewalDate: string;
   category?: string;
+  autoCreateTransaction?: boolean;
 }
 
 export const getSubscriptions = async () => {
@@ -14,6 +15,11 @@ export const getSubscriptions = async () => {
 
 export const addSubscription = async (data: SubscriptionData) => {
   const res = await api.post('/subscriptions', data);
+  return res.data;
+};
+
+export const updateSubscription = async (id: string, data: Partial<SubscriptionData>) => {
+  const res = await api.put(`/subscriptions/${id}`, data);
   return res.data;
 };
 

@@ -34,13 +34,17 @@ router.post('/', auth, async (req, res) => {
     // If autoCreateTransaction is enabled, create a recurring transaction
     if (sub.autoCreateTransaction) {
       try {
+        // Use today's date for the initial transaction, not the renewal date
+        // The renewal date is when the subscription renews, but the first transaction should be today
+        const today = new Date().toISOString().split('T')[0];
+        
         const { recurringTransaction } = await createRecurringTransaction(req.userId, {
           type: 'Expense',
           category: category || 'Subscription',
           amount,
           description: `Subscription: ${name}`,
           frequency: 'monthly',
-          startDate: renewalDate,
+          startDate: today, // Use today for initial transaction
           endDate: null
         });
 
@@ -56,6 +60,32 @@ router.post('/', auth, async (req, res) => {
   } catch (err) {
     console.error('Create subscription error:', err);
     res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
+// PUT update a subscription
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const { name, amount, renewalDate, category, autoCreateTransaction } = req.body;
+    
+    const sub = await Subscription.findOne({ _id: req.params.id, userId: req.userId });
+    
+    if (!sub) {
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+
+    // Update subscription fields
+    if (name !== undefined) sub.name = name;
+    if (amount !== undefined) sub.amount = amount;
+    if (renewalDate !== undefined) sub.renewalDate = renewalDate;
+    if (category !== undefined) sub.category = category;
+    if (autoCreateTransaction !== undefined) sub.autoCreateTransaction = autoCreateTransaction;
+
+    await sub.save();
+    res.json(sub);
+  } catch (err) {
+    console.error('Update subscription error:', err);
+    res.status(500).json({ error: 'Failed to update subscription' });
   }
 });
 

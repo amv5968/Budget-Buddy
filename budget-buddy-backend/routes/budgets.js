@@ -34,10 +34,12 @@ router.get('/', auth, async (req, res) => {
     const budgetsWithSpent = await Promise.all(
       budgets.map(async (budget) => {
         // Get transactions matching budget type and category
+        // Exclude recurring transaction templates (isRecurring: true)
         const transactions = await Transaction.find({
           userId: req.userId,
           category: budget.category,
-          type: budget.type // Match budget type (Income or Expense)
+          type: budget.type, // Match budget type (Income or Expense)
+          isRecurring: { $ne: true } // Exclude recurring transaction templates
         });
         
         // Calculate total spent/earned from matching transactions

@@ -90,6 +90,13 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       icon: '📘',
       description: 'Financial education and tools',
       route: '/(tabs)/resources',
+    },
+    {
+      id: 'survey',
+      title: 'Feedback & Survey',
+      icon: '⭐',
+      description: 'Rate the app and share your feedback',
+      route: '/survey',
     }
   ];
 
