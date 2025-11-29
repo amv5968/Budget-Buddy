@@ -97,6 +97,13 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       icon: '⭐',
       description: 'Rate the app and share your feedback',
       route: '/survey',
+    },
+    {
+      id: 'what-if',
+      title: 'What If Calculator',
+      icon: '💡',
+      description: 'Calculate savings from reducing expenses',
+      route: '/what-if',
     }
   ];
 

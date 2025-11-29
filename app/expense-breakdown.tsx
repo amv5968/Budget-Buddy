@@ -27,7 +27,7 @@ export default function ExpenseBreakdownScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year' | 'all'>('month');
-  const [selectedChartType, setSelectedChartType] = useState<'pie' | 'bar' | 'line'>('pie');
+  const [selectedChartType, setSelectedChartType] = useState<'pie' | 'bar' | 'line' | 'sankey'>('pie');
 
   useFocusEffect(
     useCallback(() => {
@@ -131,6 +131,7 @@ export default function ExpenseBreakdownScreen() {
   const getTotalExpenses = () => {
     return getFilteredTransactions().reduce((sum, t) => sum + Math.abs(t.amount), 0);
   };
+
 
   const getIconForCategory = (category: string) => {
     const icons: { [key: string]: string } = {
@@ -439,6 +440,19 @@ export default function ExpenseBreakdownScreen() {
                     Trend
                   </Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.chartTypeButton, selectedChartType === 'sankey' && styles.chartTypeButtonActive]}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/sankey-chart',
+                      params: { period: selectedPeriod },
+                    } as any);
+                  }}
+                >
+                  <Text style={[styles.chartTypeText, selectedChartType === 'sankey' && styles.chartTypeTextActive]}>
+                    Sankey
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -504,6 +518,7 @@ export default function ExpenseBreakdownScreen() {
                 style={{ borderRadius: 16 }}
               />
             )}
+
           </View>
 
           {/* Category Details */}
