@@ -9,6 +9,7 @@ const {
   stopRecurringTransaction,
   getActiveRecurringTransactions
 } = require('../services/recurringTransactionService');
+const { updateBudgetFromTransactions } = require('../services/budgetUpdateService');
 
 const router = express.Router();
 
@@ -33,6 +34,10 @@ router.post('/', auth, async (req, res) => {
 
     await transaction.save();
     console.log('Transaction saved:', transaction);
+    
+    // Update budget for this transaction's category and type
+    await updateBudgetFromTransactions(req.userId, type, category);
+    
     res.status(201).json(transaction);
   } catch (error) {
     console.error('Transaction creation error:', error);
@@ -89,14 +94,29 @@ router.put('/:id', auth, async (req, res) => {
   try {
     const { type, category, amount, description, date } = req.body;
 
+    // Get the old transaction to know which budget to update
+    const oldTransaction = await Transaction.findOne({
+      _id: req.params.id,
+      userId: req.userId
+    });
+
+    if (!oldTransaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
     const transaction = await Transaction.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
       { type, category, amount, description, date },
       { new: true, runValidators: true }
     );
 
-    if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
+    // Update budgets for both old and new category/type
+    // Update old budget (in case category or type changed)
+    await updateBudgetFromTransactions(req.userId, oldTransaction.type, oldTransaction.category);
+    
+    // Update new budget (if category or type changed)
+    if (oldTransaction.type !== type || oldTransaction.category !== category) {
+      await updateBudgetFromTransactions(req.userId, type, category);
     }
 
     res.json(transaction);
@@ -108,7 +128,8 @@ router.put('/:id', auth, async (req, res) => {
 
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const transaction = await Transaction.findOneAndDelete({
+    // Get transaction before deleting to know which budget to update
+    const transaction = await Transaction.findOne({
       _id: req.params.id,
       userId: req.userId
     });
@@ -116,6 +137,17 @@ router.delete('/:id', auth, async (req, res) => {
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
+
+    // Store category and type before deletion
+    const { type, category } = transaction;
+
+    await Transaction.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId
+    });
+
+    // Update budget after deletion
+    await updateBudgetFromTransactions(req.userId, type, category);
 
     res.json({ message: 'Transaction deleted successfully' });
   } catch (error) {

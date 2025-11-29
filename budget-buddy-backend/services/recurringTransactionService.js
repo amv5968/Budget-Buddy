@@ -1,5 +1,6 @@
 const Transaction = require('../models/Transaction');
 const Subscription = require('../models/Subscription');
+const { updateBudgetFromTransactions } = require('./budgetUpdateService');
 
 function calculateNextDate(currentDate, frequency) {
   const date = new Date(currentDate);
@@ -62,6 +63,9 @@ async function processRecurringTransactions() {
 
         await newTransaction.save();
         console.log(`Created new transaction from recurring: ${newTransaction._id}`);
+
+        // Update budget for this transaction
+        await updateBudgetFromTransactions(recurringTx.userId, recurringTx.type, recurringTx.category);
 
         recurringTx.lastProcessedDate = now;
         recurringTx.nextRecurringDate = calculateNextDate(now, recurringTx.recurringFrequency);
@@ -132,6 +136,9 @@ async function processSubscriptions() {
 
           await newTransaction.save();
           console.log(`Created transaction from subscription: ${subscription.name}`);
+
+          // Update budget for this transaction
+          await updateBudgetFromTransactions(subscription.userId, 'Expense', subscription.category || 'Subscription');
 
           subscription.lastTransactionDate = now;
           
@@ -205,6 +212,9 @@ async function createRecurringTransaction(userId, transactionData) {
   });
 
   await firstTransaction.save();
+
+  // Update budget for the initial transaction
+  await updateBudgetFromTransactions(userId, type, category);
 
   return { recurringTransaction, firstTransaction };
 }
