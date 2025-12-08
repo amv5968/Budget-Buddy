@@ -5,6 +5,7 @@ const DASHBOARD_PREFS_KEY = '@dashboard_preferences';
 export interface DashboardPreferences {
   showSummary: boolean;
   showAllowance: boolean;
+  showNetWorth: boolean;
   showTransactions: boolean;
   showGoals: boolean;
   showBudgets: boolean;
@@ -14,6 +15,7 @@ export interface DashboardPreferences {
 const DEFAULT_PREFERENCES: DashboardPreferences = {
   showSummary: true,
   showAllowance: true,
+  showNetWorth: true,
   showTransactions: true,
   showGoals: true,
   showBudgets: true,

@@ -1,26 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import {
-    ChatMessage,
-    getQuickInsights,
-    getSuggestedQuestions,
-    sendMessageToAI,
+  ChatMessage,
+  getQuickInsights,
+  getSuggestedQuestions,
+  sendMessageToAI,
 } from '../services/aiService';
 
 export default function AIAssistantScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -116,11 +118,24 @@ export default function AIAssistantScreen() {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
+    backButton: {
+      position: 'absolute',
+      top: 60,
+      left: 20,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+    },
     headerTitle: {
       fontSize: 28,
       fontWeight: 'bold',
       color: colors.text,
       marginBottom: 4,
+      marginTop: 40,
     },
     headerSubtitle: {
       fontSize: 14,
@@ -329,6 +344,12 @@ export default function AIAssistantScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>🤖 AI Financial Advisor</Text>
         <Text style={styles.headerSubtitle}>
           Ask me anything about your finances

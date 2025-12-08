@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -26,6 +27,7 @@ interface Tip {
 }
 
 const ResourcesScreen: React.FC = () => {
+  const router = useRouter();
   const { colors } = useTheme();
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
@@ -398,10 +400,23 @@ const ResourcesScreen: React.FC = () => {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
+    backButton: {
+      position: 'absolute',
+      top: 60,
+      left: 20,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+    },
     headerContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 8,
+      marginTop: 40,
     },
     header: {
       fontSize: 24,
@@ -556,6 +571,12 @@ const ResourcesScreen: React.FC = () => {
     <View style={dynamicStyles.container}>
       {/* Header */}
       <View style={dynamicStyles.headerSection}>
+        <TouchableOpacity
+          style={dynamicStyles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <View style={dynamicStyles.headerContainer}>
           <Ionicons name="book-outline" size={28} color={colors.primary} />
           <Text style={dynamicStyles.header}>Student Resources</Text>

@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import Sidebar from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -91,6 +92,7 @@ export default function HomeScreen() {
   const [dashboardPrefs, setDashboardPrefs] = useState<DashboardPreferences>({
     showSummary: true,
     showAllowance: true,
+    showNetWorth: true,
     showTransactions: true,
     showGoals: true,
     showBudgets: true,
@@ -640,6 +642,43 @@ export default function HomeScreen() {
 
   const spendingTrendData = calculateSpendingTrend();
   const incomeVsExpensesData = calculateIncomeVsExpenses();
+
+  // Calculate Net Worth trend over last 7 days
+  const calculateNetWorthTrend = () => {
+    const last7Days = [];
+    const labels = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset to start of day
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i); // Go BACK i days
+      const dateStr = date.toISOString().split('T')[0];
+      labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+      
+      // Calculate income and expenses up to and including this date
+      let cumulativeIncome = 0;
+      let cumulativeExpense = 0;
+      
+      allTransactions.forEach((t) => {
+        const transDate = new Date(t.date);
+        transDate.setHours(0, 0, 0, 0);
+        if (transDate <= date) {
+          if (t.type === 'Income') {
+            cumulativeIncome += Math.abs(t.amount);
+          } else {
+            cumulativeExpense += Math.abs(t.amount);
+          }
+        }
+      });
+      
+      last7Days.push(cumulativeIncome - cumulativeExpense);
+    }
+    
+    return { labels, data: last7Days };
+  };
+
+  const netWorthTrendData = calculateNetWorthTrend();
 
   // --- styles ---
   const styles = StyleSheet.create({
@@ -1362,6 +1401,65 @@ export default function HomeScreen() {
       fontWeight: '600',
       color: colors.primary,
     },
+    netWorthCard: {
+      backgroundColor: colors.cardBackground,
+      marginHorizontal: 20,
+      marginBottom: 15,
+      borderRadius: 12,
+      padding: 20,
+      elevation: 3,
+      borderWidth: 2,
+    },
+    netWorthHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    netWorthTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginLeft: 8,
+    },
+    netWorthAmount: {
+      fontSize: 36,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    netWorthBreakdown: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    netWorthItem: {
+      alignItems: 'center',
+    },
+    netWorthItemLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    },
+    netWorthItemValue: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    netWorthGraphContainer: {
+      marginTop: 16,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      alignItems: 'center',
+    },
+    netWorthGraphTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 12,
+      textAlign: 'center',
+    },
   });
 
   if (loading) {
@@ -1443,6 +1541,104 @@ export default function HomeScreen() {
             >
               ${(totalIncome - totalExpense).toFixed(2)}
             </Text>
+          </View>
+        </View>
+      )}
+
+      {dashboardPrefs.showNetWorth && (
+        <View style={[
+          styles.netWorthCard,
+          { borderColor: totalIncome - totalExpense >= 0 ? colors.income : colors.expense }
+        ]}>
+          <View style={styles.netWorthHeader}>
+            <Ionicons 
+              name="analytics" 
+              size={24} 
+              color={totalIncome - totalExpense >= 0 ? colors.income : colors.expense} 
+            />
+            <Text style={styles.netWorthTitle}>Net Worth</Text>
+          </View>
+          <Text 
+            style={[
+              styles.netWorthAmount,
+              { color: totalIncome - totalExpense >= 0 ? colors.income : colors.expense }
+            ]}
+          >
+            ${Math.abs(totalIncome - totalExpense).toFixed(2)}
+          </Text>
+          <View style={styles.netWorthBreakdown}>
+            <View style={styles.netWorthItem}>
+              <Text style={styles.netWorthItemLabel}>Total Income</Text>
+              <Text style={[styles.netWorthItemValue, { color: colors.income }]}>
+                ${totalIncome.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.netWorthItem}>
+              <Text style={styles.netWorthItemLabel}>Total Expenses</Text>
+              <Text style={[styles.netWorthItemValue, { color: colors.expense }]}>
+                ${totalExpense.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Net Worth Trend Graph */}
+          <View style={styles.netWorthGraphContainer}>
+            <Text style={styles.netWorthGraphTitle}>📈 7-Day Trend</Text>
+            {netWorthTrendData.data.length > 0 ? (
+              <LineChart
+                data={{
+                  labels: netWorthTrendData.labels,
+                  datasets: [
+                    {
+                      data: netWorthTrendData.data,
+                    },
+                  ],
+                }}
+                width={Dimensions.get('window').width - 80}
+                height={160}
+                chartConfig={{
+                  backgroundColor: colors.cardBackground,
+                  backgroundGradientFrom: colors.cardBackground,
+                  backgroundGradientTo: colors.cardBackground,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => totalIncome - totalExpense >= 0 
+                    ? `rgba(102, 187, 106, ${opacity})`  // Green
+                    : `rgba(244, 67, 54, ${opacity})`,   // Red
+                  labelColor: (opacity = 1) => colors.textSecondary,
+                  style: {
+                    borderRadius: 16,
+                  },
+                  propsForDots: {
+                    r: '5',
+                    strokeWidth: '2',
+                    stroke: totalIncome - totalExpense >= 0 ? colors.income : colors.expense,
+                  },
+                  propsForBackgroundLines: {
+                    strokeDasharray: '',
+                    stroke: colors.border,
+                    strokeWidth: 1,
+                  },
+                }}
+                bezier
+                style={{
+                  marginVertical: 8,
+                  borderRadius: 16,
+                }}
+                withInnerLines={true}
+                withOuterLines={false}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                withDots={true}
+                withShadow={false}
+                fromZero={false}
+              />
+            ) : (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                  No data available for trend
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -2084,6 +2280,22 @@ export default function HomeScreen() {
                     onValueChange={() => handleToggleSection('showAllowance')}
                     trackColor={{ false: colors.border, true: colors.primary + '80' }}
                     thumbColor={tempPrefs.showAllowance ? colors.primary : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customizeItem}
+                  onPress={() => handleToggleSection('showNetWorth')}
+                >
+                  <View style={styles.customizeItemLeft}>
+                    <Text style={styles.customizeItemIcon}>💎</Text>
+                    <Text style={styles.customizeItemText}>Net Worth</Text>
+                  </View>
+                  <Switch
+                    value={tempPrefs.showNetWorth}
+                    onValueChange={() => handleToggleSection('showNetWorth')}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={tempPrefs.showNetWorth ? colors.primary : colors.textSecondary}
                   />
                 </TouchableOpacity>
 
