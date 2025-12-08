@@ -1,6 +1,6 @@
 // app/services/notificationService.ts
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getTransactionStats, type Transaction } from '../services/transactionService';
 
@@ -324,6 +324,61 @@ export async function notifyBudgetThreshold(percentage: number, spent: number, t
       title: `${emoji} ${title}`,
       body: `You've spent ${percentage.toFixed(0)}% of your monthly allowance ($${spent.toFixed(2)} / $${total.toFixed(2)})`,
       data: { type: 'budget_alert', percentage },
+    },
+    trigger: null,
+  });
+}
+
+// Individual category budget alerts
+export async function notifyCategoryBudgetAlert(
+  category: string,
+  percentage: number,
+  spent: number,
+  total: number
+) {
+  const hasPermission = await requestNotificationPermissions();
+  if (!hasPermission) return;
+
+  let title = '';
+  let emoji = '';
+  
+  if (percentage >= 100) {
+    emoji = '🚨';
+    title = `${category} Budget Exceeded!`;
+  } else if (percentage >= 90) {
+    emoji = '⚠️';
+    title = `${category} Budget Alert`;
+  } else if (percentage >= 75) {
+    emoji = '💡';
+    title = `${category} Spending Alert`;
+  } else {
+    return; // Don't notify below 75%
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `${emoji} ${title}`,
+      body: `You've spent ${percentage.toFixed(0)}% of your ${category} budget ($${spent.toFixed(2)} / $${total.toFixed(2)})`,
+      data: { type: 'category_budget_alert', category, percentage },
+    },
+    trigger: null,
+  });
+}
+
+// Goal achievement notification
+export async function notifyGoalAchieved(
+  goalName: string,
+  targetAmount: number,
+  savedAmount: number
+) {
+  const hasPermission = await requestNotificationPermissions();
+  if (!hasPermission) return;
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '🎉 Goal Achieved!',
+      body: `Congratulations! You've reached your "${goalName}" goal of $${targetAmount.toFixed(2)}!`,
+      data: { type: 'goal_achieved', goalName, targetAmount, savedAmount },
     },
     trigger: null,
   });

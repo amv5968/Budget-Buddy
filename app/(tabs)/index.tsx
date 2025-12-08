@@ -22,7 +22,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { getUserProfile, updateMonthlyAllowance } from '../services/authService';
 import {
   notifyBudgetThreshold,
+  notifyCategoryBudgetAlert,
   notifyDateTransactions,
+  notifyGoalAchieved,
   requestNotificationPermissions,
   scheduleReminderNotification,
 } from '../services/notificationService';
@@ -126,6 +128,8 @@ export default function HomeScreen() {
 
   // Track last alert threshold to avoid duplicate alerts
   const lastAlertPercentage = useRef(0);
+  const lastBudgetAlerts = useRef<Record<string, number>>({});
+  const achievedGoals = useRef<Set<string>>(new Set());
 
   // --- helper: load all reminders and index by date ---
   const loadAllRemindersForCalendar = async () => {
@@ -285,6 +289,8 @@ export default function HomeScreen() {
       setBudgets(budgetsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4));
 
       checkSpendingAlerts(statsData.totalExpense, profile.monthlyAllowance);
+      checkCategoryBudgetAlerts(budgetsData);
+      checkGoalAchievements(goalsData);
     } catch (error: any) {
       console.error('Error loading data:', error);
       if (error.response?.status === 401) {
@@ -325,6 +331,58 @@ export default function HomeScreen() {
         `You've used ${percentage.toFixed(0)}% of your monthly allowance.\n\n$${(allowance - expense).toFixed(2)} left to spend.`,
         [{ text: 'Thanks', style: 'default' }]
       );
+    }
+  };
+
+  const checkCategoryBudgetAlerts = async (budgets: Budget[]) => {
+    for (const budget of budgets) {
+      const percentage = budget.totalAmount > 0 ? (budget.spentAmount / budget.totalAmount) * 100 : 0;
+      const budgetId = budget._id;
+      const lastPercentage = lastBudgetAlerts.current[budgetId] || 0;
+
+      if (percentage >= 100 && lastPercentage < 100 && budget.spentAmount > 0) {
+        lastBudgetAlerts.current[budgetId] = 100;
+        await notifyCategoryBudgetAlert(budget.category, percentage, budget.spentAmount, budget.totalAmount);
+        Alert.alert(
+          '🚨 Budget Exceeded!',
+          `Your ${budget.category} budget has been exceeded!\n\nSpent: $${budget.spentAmount.toFixed(2)} / $${budget.totalAmount.toFixed(2)}\n\nOver by: $${(budget.spentAmount - budget.totalAmount).toFixed(2)}`,
+          [{ text: 'Got it', style: 'default' }]
+        );
+      } else if (percentage >= 90 && lastPercentage < 90 && percentage < 100) {
+        lastBudgetAlerts.current[budgetId] = 90;
+        await notifyCategoryBudgetAlert(budget.category, percentage, budget.spentAmount, budget.totalAmount);
+        Alert.alert(
+          '⚠️ Budget Alert',
+          `You've spent ${percentage.toFixed(0)}% of your ${budget.category} budget.\n\nRemaining: $${(budget.totalAmount - budget.spentAmount).toFixed(2)}`,
+          [{ text: 'Okay', style: 'default' }]
+        );
+      } else if (percentage >= 75 && lastPercentage < 75 && percentage < 90) {
+        lastBudgetAlerts.current[budgetId] = 75;
+        await notifyCategoryBudgetAlert(budget.category, percentage, budget.spentAmount, budget.totalAmount);
+        Alert.alert(
+          '💡 Spending Alert',
+          `You've used ${percentage.toFixed(0)}% of your ${budget.category} budget.\n\n$${(budget.totalAmount - budget.spentAmount).toFixed(2)} left to spend.`,
+          [{ text: 'Thanks', style: 'default' }]
+        );
+      }
+    }
+  };
+
+  const checkGoalAchievements = async (goals: Goal[]) => {
+    for (const goal of goals) {
+      const goalId = goal._id;
+      const isAchieved = goal.savedAmount >= goal.targetAmount;
+      
+      // Only notify if goal is achieved and we haven't already notified for this goal
+      if (isAchieved && !achievedGoals.current.has(goalId)) {
+        achievedGoals.current.add(goalId);
+        await notifyGoalAchieved(goal.name, goal.targetAmount, goal.savedAmount);
+        Alert.alert(
+          '🎉 Congratulations!',
+          `You've achieved your "${goal.name}" goal!\n\nTarget: $${goal.targetAmount.toFixed(2)}\nSaved: $${goal.savedAmount.toFixed(2)}\n\nKeep up the great work! 💪`,
+          [{ text: 'Amazing!', style: 'default' }]
+        );
+      }
     }
   };
 
